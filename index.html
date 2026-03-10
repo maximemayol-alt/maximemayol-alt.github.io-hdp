@@ -965,6 +965,13 @@ Mode: ${favSide.toUpperCase()} favori | True line: ${document.getElementById('tr
 
 
   // ── API-Sports ───────────────────────────────────────
+  function setFetchStatus(id, type, msg){
+    const el=document.getElementById(id);
+    if(!el) return;
+    el.className='fetch-status '+type;
+    el.textContent=msg;
+  }
+
   const APISPORT_BASE='https://v1.basketball.api-sports.io/';
   function getApiSportsKey(){ return document.getElementById('apiSportsKey').value.trim(); }
   let selectedDomTeam=null, selectedExtTeam=null;
@@ -973,9 +980,14 @@ Mode: ${favSide.toUpperCase()} favori | True line: ${document.getElementById('tr
     const key=getApiSportsKey();
     if(!key) throw new Error('Clé API-Sports manquante');
     const url=APISPORT_BASE+path;
-    const res=await fetch(url,{headers:{'x-apisports-key':key}});
+    let res;
+    try{
+      res=await fetch(url,{headers:{'x-apisports-key':key}});
+    }catch(netErr){
+      throw new Error('Erreur réseau/CORS — vérifie ta clé et ton domaine dans le dashboard API-Sports (api-sports.io → My Account → Allowed origins)');
+    }
     if(res.ok) return await res.json();
-    throw new Error('HTTP '+res.status+(res.status===401?' — clé invalide':''));
+    throw new Error('HTTP '+res.status+(res.status===401?' — clé invalide':res.status===403?' — accès refusé (CORS ou plan)':''));
   }
 
   async function tsdbSearchCandidates(name){
@@ -1041,7 +1053,11 @@ Mode: ${favSide.toUpperCase()} favori | True line: ${document.getElementById('tr
       else renderCandidates(extC,'ext');
       if(domC.length===1&&extC.length===1) loadStats();
       else setFetchStatus('fetchStatus','loading','Clique sur la bonne équipe pour chaque côté.');
-    }catch(e){setFetchStatus('fetchStatus','error','Erreur: '+e.message);}
+    }catch(e){
+      const msg='❌ '+e.message;
+      setFetchStatus('fetchStatus','error',msg);
+      console.error('[tsdbSearch]',e);
+    }
   }
 
   async function loadStats(){
@@ -1061,7 +1077,11 @@ Mode: ${favSide.toUpperCase()} favori | True line: ${document.getElementById('tr
         '<div class="fetch-team-tag">🏠 <span class="tn">'+domTeam.name+'</span> — '+domHome.length+' matchs DOM</div>'+
         '<div class="fetch-team-tag">✈️ <span class="tn">'+extTeam.name+'</span> — '+extAway.length+' matchs EXT</div>';
       setFetchStatus('fetchStatus','success','✅ Stats chargées — DOM: '+domHome.length+' • EXT: '+extAway.length);
-    }catch(e){setFetchStatus('fetchStatus','error','Erreur: '+e.message);}
+    }catch(e){
+      const msg='❌ '+e.message;
+      setFetchStatus('fetchStatus','error',msg);
+      console.error('[loadStats]',e);
+    }
   }
 
   function applyPaste(){
