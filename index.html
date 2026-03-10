@@ -965,6 +965,13 @@ Mode: ${favSide.toUpperCase()} favori | True line: ${document.getElementById('tr
 
 
   // ── API-Sports ───────────────────────────────────────
+  function setFetchStatus(id, type, msg){
+    const el=document.getElementById(id);
+    if(!el) return;
+    el.className='fetch-status '+type;
+    el.textContent=msg;
+  }
+
   const APISPORT_BASE='https://v1.basketball.api-sports.io/';
   function getApiSportsKey(){ return document.getElementById('apiSportsKey').value.trim(); }
   let selectedDomTeam=null, selectedExtTeam=null;
