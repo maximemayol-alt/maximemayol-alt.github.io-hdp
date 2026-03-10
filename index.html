@@ -142,6 +142,23 @@
     <button class="btn" onclick="tsdbSearch()">🔍 Rechercher les équipes</button>
     <div class="fetch-status" id="fetchStatus"></div>
     <div class="fetch-teams" id="fetchTeams"></div>
+
+    <div class="sep" style="margin-top:12px"></div>
+    <div class="label" style="margin-top:10px">🎯 Cotes auto <span class="badge new">THE ODDS API</span></div>
+    <div class="mini" style="margin-bottom:8px">Charge les spreads Pinnacle pour le match sélectionné ci-dessus. Clé gratuite sur <b>the-odds-api.com</b>.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+      <input type="text" id="oddsApiKey" placeholder="Clé The Odds API" style="flex:2;min-width:180px;font-size:13px" />
+      <select id="oddsSport" style="flex:1;min-width:130px;background:#0D1525;border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:9px 10px;font-size:13px;outline:none">
+        <option value="basketball_nba">NBA</option>
+        <option value="basketball_euroleague">Euroleague</option>
+        <option value="basketball_nbl">NBL</option>
+        <option value="basketball_wnba">WNBA</option>
+        <option value="basketball_ncaab">NCAA</option>
+        <option value="basketball_nba_preseason">NBA Pré-saison</option>
+      </select>
+    </div>
+    <button class="btn" style="margin-top:8px" onclick="loadOdds()">🎯 Charger les cotes Pinnacle</button>
+    <div class="fetch-status" id="oddsStatus"></div>
   </div>
 
   <!-- PASTE SCORES -->
@@ -1055,6 +1072,72 @@ Mode: ${favSide.toUpperCase()} favori | True line: ${document.getElementById('tr
     recalc();
   }
 
+  // ── The Odds API ─────────────────────────────────────
+  const ODDS_API_BASE = 'https://api.the-odds-api.com/v4/';
+
+  function setOddsStatus(type, msg){
+    const el = document.getElementById('oddsStatus');
+    el.className = 'fetch-status ' + type;
+    el.textContent = msg;
+  }
+
+  function oddsNameMatch(oddsName, apiName){
+    if(!oddsName || !apiName) return false;
+    const a = oddsName.toLowerCase();
+    const b = apiName.toLowerCase();
+    const words = b.split(/\s+/).filter(w => w.length > 3);
+    return words.some(w => a.includes(w)) || a.includes(b.slice(0,5)) || b.includes(a.slice(0,5));
+  }
+
+  async function loadOdds(){
+    const key = document.getElementById('oddsApiKey').value.trim();
+    const sport = document.getElementById('oddsSport').value;
+    if(!key){ setOddsStatus('error','❌ Entre ta clé The Odds API.'); return; }
+    if(!selectedDomTeam || !selectedExtTeam){ setOddsStatus('error','❌ Sélectionne d\'abord les deux équipes via API-Sports.'); return; }
+    try{ localStorage.setItem('odds_api_key', key); }catch(e){}
+    setOddsStatus('loading','⏳ Recherche du match sur The Odds API...');
+    try{
+      const url = ODDS_API_BASE + 'sports/' + sport + '/odds?apiKey=' + encodeURIComponent(key)
+        + '&regions=eu,uk&markets=spreads&oddsFormat=decimal&bookmakers=pinnacle';
+      const res = await fetch(url);
+      if(!res.ok){
+        const errMsg = res.status===401 ? ' — clé invalide' : res.status===422 ? ' — sport non disponible' : '';
+        throw new Error('HTTP ' + res.status + errMsg);
+      }
+      const events = await res.json();
+      const ev = events.find(e =>
+        (oddsNameMatch(e.home_team, selectedDomTeam.name) && oddsNameMatch(e.away_team, selectedExtTeam.name)) ||
+        (oddsNameMatch(e.home_team, selectedExtTeam.name) && oddsNameMatch(e.away_team, selectedDomTeam.name))
+      );
+      if(!ev){ setOddsStatus('error','❌ Match non trouvé. Essaie un autre sport ou vérifie les noms d\'équipes.'); return; }
+      const bk = ev.bookmakers?.[0];
+      if(!bk){ setOddsStatus('error','❌ Pinnacle n\'a pas encore de cotes pour ce match.'); return; }
+      const market = bk.markets?.find(m => m.key === 'spreads');
+      if(!market || !market.outcomes?.length){ setOddsStatus('error','❌ Pas de marché spreads disponible.'); return; }
+      const linesMap = {};
+      market.outcomes.forEach(o => {
+        const pt = Math.abs(o.point).toFixed(1);
+        if(!linesMap[pt]) linesMap[pt] = {};
+        if(o.point < 0) linesMap[pt].coteFav = o.price;
+        else linesMap[pt].coteDog = o.price;
+      });
+      document.getElementById('lineBody').innerHTML = '';
+      Object.keys(linesMap).sort((a,b) => parseFloat(a)-parseFloat(b)).forEach(pt => {
+        addLineRow(parseFloat(pt));
+        const rows = document.querySelectorAll('#lineBody tr');
+        const lastRow = rows[rows.length-1];
+        const inputs = lastRow.querySelectorAll('input');
+        if(linesMap[pt].coteFav) inputs[1].value = linesMap[pt].coteFav.toFixed(3);
+        if(linesMap[pt].coteDog) inputs[2].value = linesMap[pt].coteDog.toFixed(3);
+      });
+      recalc();
+      const nLines = Object.keys(linesMap).length;
+      setOddsStatus('success','✅ ' + nLines + ' ligne(s) chargée(s) depuis ' + bk.title + ' — ' + ev.home_team + ' vs ' + ev.away_team);
+    }catch(e){
+      setOddsStatus('error','❌ Erreur: ' + e.message);
+    }
+  }
+
   // ── Boot ─────────────────────────────────────────────
   makeRows();
   try{stableMode=localStorage.getItem('hdp_v5_stable')==='1';}catch(e){}
@@ -1066,6 +1149,7 @@ Mode: ${favSide.toUpperCase()} favori | True line: ${document.getElementById('tr
   document.getElementById('modeGlobBtn').classList.toggle('active',modeGlobalOnly);
   document.getElementById('recencyOff').classList.toggle('active',!recencyMode);
   document.getElementById('recencyOn').classList.toggle('active',recencyMode);
+  try{ document.getElementById('oddsApiKey').value = localStorage.getItem('odds_api_key') || ''; }catch(e){}
   updateAdjUI();
   recalc();
 </script>
