@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+<title>HDP Calculator V6 — Handicap Basket</title>
+<style>
+  :root{
+    --bg:#080C17; --card:#0F1A2E; --card2:#111827; --ink:#E2E8F0; --muted:#94A3B8;
+    --line:#1F2D3D; --blue:#3B82F6; --purple:#8B5CF6; --green:#00C896; --amber:#FFB800; --red:#FF4D4D;
+    --orange:#FF8C00;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;padding:14px 12px 70px;}
+  h1{font-size:18px;letter-spacing:.04em}
+  .sub{color:var(--muted);font-size:11px;letter-spacing:.25em;text-transform:uppercase;margin-bottom:6px}
+  .badge{display:inline-block;background:#1565C0;color:#fff;font-size:10px;padding:3px 10px;border-radius:999px;margin-top:6px}
+  .badge.new{background:#1A4A2A;color:var(--green);border:1px solid var(--green)}
+  .wrap{max-width:760px;margin:0 auto}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:12px}
+  .label{font-size:11px;color:var(--muted);letter-spacing:.18em;text-transform:uppercase;margin-bottom:8px}
+  .mini{font-size:12px;color:var(--muted);line-height:1.4}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .col{flex:1;min-width:160px}
+  .pillbar{display:flex;gap:8px;flex-wrap:wrap}
+  .pill{flex:1;min-width:100px;background:#0D1525;border:1px solid var(--line);border-radius:10px;color:var(--muted);padding:9px 6px;font-weight:700;font-size:12px;cursor:pointer;transition:all .15s}
+  .pill.active{border-color:#1565C0;background:#0D3B6E;color:#fff}
+  .pill.green.active{border-color:var(--green);background:#0A2A1F;color:var(--green)}
+  .pill.purple.active{border-color:var(--purple);background:#1A0A3E;color:var(--purple)}
+  .pill.blue.active{border-color:var(--blue);background:#0D2B6E;color:var(--blue)}
+  .pill.amber.active{border-color:var(--amber);background:#2A1F00;color:var(--amber)}
+  .hint{margin-top:8px;font-size:12px;color:var(--muted)}
+  table{width:100%;border-collapse:collapse}
+  th,td{border-bottom:1px solid var(--line);padding:7px 5px;text-align:center;font-size:12px}
+  th{font-size:10px;color:#cbd5e1;letter-spacing:.12em;text-transform:uppercase;background:#0D3B6E}
+  tr:last-child td{border-bottom:none}
+  .w-badge{display:inline-block;font-size:9px;padding:1px 5px;border-radius:99px;font-weight:700;vertical-align:middle;margin-left:3px}
+  .w1{background:#0A3A2A;color:#00C896}
+  .w2{background:#0A2F24;color:#00B082}
+  .w3{background:#0A2419;color:#008A65}
+  .w4{background:#0A1A10;color:#006448}
+  .w5{background:#0A120A;color:#004030}
+  input{width:100%;background:#0D1525;border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:9px 10px;font-size:15px;outline:none;transition:border .15s}
+  input:focus{border-color:var(--blue)}
+  input::placeholder{color:#2D3748}
+  .btn{width:100%;background:#1565C0;border:none;border-radius:12px;padding:11px 14px;color:#fff;font-weight:800;letter-spacing:.04em;margin-top:10px;cursor:pointer;font-size:13px;transition:opacity .15s}
+  .btn.secondary{background:transparent;border:1px solid var(--line);color:var(--muted)}
+  .btn.green-btn{background:#0A3A2A;border:1px solid var(--green);color:var(--green)}
+  .btn.amber-btn{background:#2A1F00;border:1px solid var(--amber);color:var(--amber)}
+  .btn:active{opacity:.8}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .kpi{display:flex;gap:10px;flex-wrap:wrap}
+  .k{flex:1;min-width:130px;background:#0D1525;border:1px solid var(--line);border-radius:12px;padding:10px;position:relative}
+  .k .t{font-size:10px;color:var(--muted);letter-spacing:.16em;text-transform:uppercase;margin-bottom:4px}
+  .k .v{font-size:18px;font-weight:900}
+  .k .s{font-size:11px;color:var(--muted);margin-top:2px}
+  .good{color:var(--green)} .warn{color:var(--amber)} .bad{color:var(--red)} .info{color:var(--blue)}
+  .canvasCard{padding:10px}
+  canvas{width:100%;height:160px;display:block}
+  .verdict{border-radius:12px;padding:12px;text-align:center;font-weight:900;font-size:15px;margin-top:10px;border:2px solid var(--line);line-height:1.5}
+  .verdict.good{border-color:var(--green);background:#0A2A1F}
+  .verdict.warn{border-color:var(--amber);background:#2A1F00}
+  .verdict.bad{border-color:var(--red);background:#2A0A0A}
+  .copy{margin-top:10px}
+  .copy.small{font-size:12px}
+  .copyBtn{width:100%;background:#0D1525;border:1px solid var(--line);border-radius:12px;padding:12px;color:#fff;font-weight:800;cursor:pointer;font-size:13px}
+  .copyBtn.copied{background:var(--green);color:#001a12;border-color:var(--green)}
+  .sep{height:1px;background:var(--line);margin:10px 0}
+  .fetch-status{margin-top:10px;padding:10px;border-radius:10px;font-size:12px;display:none}
+  .fetch-status.loading{display:block;background:#0D2B6E;border:1px solid var(--blue);color:var(--blue)}
+  .fetch-status.success{display:block;background:#0A2A1F;border:1px solid var(--green);color:var(--green)}
+  .fetch-status.error{display:block;background:#2A0A0A;border:1px solid var(--red);color:var(--red)}
+  .fetch-teams{margin-top:8px;display:flex;gap:10px;flex-wrap:wrap}
+  .fetch-team-tag{background:#0D1525;border:1px solid var(--line);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700}
+  .fetch-team-tag .tn{color:var(--green)}
+  .tab-bar{display:flex;gap:6px;margin-bottom:10px}
+  .tab-btn{flex:1;background:#0D1525;border:1px solid var(--line);border-radius:10px;color:var(--muted);padding:9px;font-weight:700;font-size:12px;cursor:pointer}
+  .tab-btn.active{border-color:var(--blue);background:#0D2B6E;color:#fff}
+  .tab-pane{display:none}
+  .tab-pane.active{display:block}
+  textarea{width:100%;background:#0D1525;border:1px solid var(--line);border-radius:10px;color:var(--ink);padding:10px;font-size:13px;font-family:monospace;outline:none;resize:vertical;min-height:90px}
+  textarea:focus{border-color:var(--blue)}
+
+  /* Ajustement card */
+  .adj-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+  .adj-side{background:#0D1525;border:1px solid var(--line);border-radius:12px;padding:10px}
+  .adj-side .label{margin-bottom:6px}
+  .adj-input-row{display:flex;align-items:center;gap:8px}
+  .adj-val{font-size:22px;font-weight:900;min-width:52px;text-align:center;padding:6px 0;color:var(--ink)}
+  .adj-val.pos{color:var(--green)}
+  .adj-val.neg{color:var(--red)}
+  .adj-btn{background:#0A1525;border:1px solid var(--line);border-radius:8px;color:var(--ink);font-size:18px;font-weight:900;cursor:pointer;width:36px;height:36px;display:flex;align-items:center;justify-content:center}
+  .adj-btn:active{opacity:.7}
+  .presets{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+  .preset-btn{font-size:10px;padding:4px 8px;border-radius:8px;border:1px solid var(--line);background:#0A1525;color:var(--muted);cursor:pointer;font-weight:700}
+  .preset-btn:active{opacity:.7}
+  .preset-btn.red-p{border-color:#FF4D4D44;color:var(--red)}
+  .preset-btn.green-p{border-color:#00C89644;color:var(--green)}
+
+  /* warning banner */
+  .warn-banner{background:#2A1500;border:1px solid var(--amber);border-radius:10px;padding:8px 12px;font-size:12px;color:var(--amber);margin-top:8px;display:none}
+  .warn-banner.show{display:block}
+
+  /* sigma meter */
+  .sigma-meter{margin-top:6px;height:6px;border-radius:3px;background:#1F2D3D;overflow:hidden}
+  .sigma-fill{height:100%;border-radius:3px;transition:width .3s,background .3s}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div style="text-align:center;margin-top:6px">
+    <div class="sub">Handicap Basket</div>
+    <h1>HDP CALCULATOR V6</h1>
+    <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:6px">
+      <div class="badge">True Line • Monte-Carlo • EV</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- CALC MODE (existant)                                   -->
+  <!-- ══════════════════════════════════════════════════════ -->
+
+
+  <!-- IMPORT AUTO -->
+  <div class="card">
+    <div class="label">🔎 Import automatique des stats <span class="badge new">API-SPORTS</span></div>
+    <div class="mini">Recherche les 5 derniers matchs DOM et EXT via API-Sports. Si introuvable, utilise le <b>Paste</b> ci-dessous.</div>
+    <div class="sep"></div>
+    <div class="two">
+      <div>
+        <div class="label" style="margin-bottom:4px">Équipe domicile</div>
+        <input type="text" id="fetchDom" placeholder="Ex: Skallagrimur" />
+        <div id="candidatesDom" style="margin-top:6px;display:none;flex-direction:column;gap:4px"></div>
+      </div>
+      <div>
+        <div class="label" style="margin-bottom:4px">Équipe extérieur</div>
+        <input type="text" id="fetchExt" placeholder="Ex: Breidablik" />
+        <div id="candidatesExt" style="margin-top:6px;display:none;flex-direction:column;gap:4px"></div>
+      </div>
+    </div>
+    <button class="btn" onclick="tsdbSearch()">🔍 Rechercher les équipes</button>
+    <div class="fetch-status" id="fetchStatus"></div>
+    <div class="fetch-teams" id="fetchTeams"></div>
+  </div>
+
+  <!-- PASTE SCORES -->
+  <div class="card">
+    <div class="label">📋 Scores — Paste</div>
+    <div class="mini">Colle les scores depuis Sofascore, Betexplorer…<br>Format : <b>un match par ligne</b>, ex: <b>105 98</b> ou <b>105-98</b><br>⚠️ Match 1 = le plus <b>récent</b> (poids max).</div>
+    <div class="sep"></div>
+    <div class="two">
+      <div>
+        <div class="label" style="margin-bottom:4px">DOM — matchs à domicile</div>
+        <textarea id="pasteDom" placeholder="105 98&#10;112 104&#10;88 95&#10;99 101&#10;115 108"></textarea>
+      </div>
+      <div>
+        <div class="label" style="margin-bottom:4px">EXT — matchs à l'extérieur</div>
+        <textarea id="pasteExt" placeholder="91 103&#10;88 79&#10;102 97&#10;95 100&#10;110 99"></textarea>
+      </div>
+    </div>
+    <div class="two" style="margin-top:6px">
+      <div>
+        <div class="label" style="margin-bottom:4px">GLOBAL DOM (optionnel)</div>
+        <textarea id="pasteDomG" placeholder="(laisser vide si pas besoin)"></textarea>
+      </div>
+      <div>
+        <div class="label" style="margin-bottom:4px">GLOBAL EXT (optionnel)</div>
+        <textarea id="pasteExtG" placeholder="(laisser vide si pas besoin)"></textarea>
+      </div>
+    </div>
+    <button class="btn" onclick="applyPaste()">✅ Appliquer les scores</button>
+    <div class="fetch-status" id="pasteStatus"></div>
+  </div>
+
+
+  <!-- FAVORI -->
+  <div class="card">
+    <div class="label">1) Favori du match</div>
+    <div class="pillbar">
+      <button class="pill blue active" id="favDomBtn" onclick="setFav('dom')">🏠 DOM favori</button>
+      <button class="pill purple" id="favExtBtn" onclick="setFav('ext')">✈️ EXT favori</button>
+    </div>
+    <div class="hint">DOM/EXT = rôle dans le match de ce soir.</div>
+  </div>
+
+  <!-- MODE -->
+  <div class="card">
+    <div class="label">2) Mode de calcul</div>
+    <div class="row" style="align-items:center">
+      <div class="col">
+        <div class="mini"><b>STABLE ON</b> = mélange 5 matchs contextuels + 5 globaux pour stabiliser.</div>
+      </div>
+      <div class="col" style="min-width:200px">
+        <div class="pillbar">
+          <button class="pill active" id="stableOff" onclick="setStable(false)">OFF</button>
+          <button class="pill green" id="stableOn" onclick="setStable(true)">ON</button>
+        </div>
+      </div>
+    </div>
+    <div class="sep"></div>
+    <div class="row" style="align-items:center">
+      <div class="col">
+        <div class="mini"><b>CONTEXTE</b> = DOM dom + EXT ext. <b>GLOBAL</b> = blocs globaux + bonus +2.5 pts domicile.</div>
+      </div>
+      <div class="col" style="min-width:200px">
+        <div class="pillbar">
+          <button class="pill active" id="modeCtxBtn" onclick="setModeGlobal(false)">CONTEXTE</button>
+          <button class="pill purple" id="modeGlobBtn" onclick="setModeGlobal(true)">GLOBAL</button>
+        </div>
+      </div>
+    </div>
+    <div class="sep"></div>
+    <div class="row" style="align-items:center">
+      <div class="col">
+        <div class="mini">
+          <b>⚖️ Pondération récence</b> — Match 1 = plus récent = poids max.<br>
+          Poids : <span style="color:var(--green)">M1×1.0</span> · M2×0.85 · M3×0.70 · M4×0.55 · <span style="color:var(--muted)">M5×0.40</span>
+        </div>
+      </div>
+      <div class="col" style="min-width:200px">
+        <div class="pillbar">
+          <button class="pill active" id="recencyOff" onclick="setRecency(false)">OFF</button>
+          <button class="pill amber" id="recencyOn" onclick="setRecency(true)">ON ⚖️</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATS CONTEXTUELS -->
+  <div class="card">
+    <div class="label">3) Stats — 5 matchs contextuels <span style="color:var(--muted);font-weight:400;font-size:10px">(match 1 = plus récent)</span></div>
+    <div class="mini">Entre : <b>pts équipe</b> / <b>pts adversaire</b>. Le poids de chaque match est indiqué.</div>
+    <div class="sep"></div>
+    <div class="warn-banner" id="warnCtx"></div>
+    <div class="two">
+      <div>
+        <div class="label" style="margin-bottom:6px">DOM (matchs à domicile)</div>
+        <table>
+          <thead><tr><th>#</th><th>DOM</th><th>ADV</th></tr></thead>
+          <tbody id="dBody"></tbody>
+        </table>
+      </div>
+      <div>
+        <div class="label" style="margin-bottom:6px">EXT (matchs à l'extérieur)</div>
+        <table>
+          <thead><tr><th>#</th><th>EXT</th><th>ADV</th></tr></thead>
+          <tbody id="eBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATS GLOBAL -->
+  <div class="card">
+    <div class="label">3bis) Stats — GLOBAL (tous lieux, optionnel)</div>
+    <div class="mini">5 derniers matchs dom+ext mélangés. Match 1 = plus récent.</div>
+    <div class="sep"></div>
+    <div class="two">
+      <div>
+        <div class="label" style="margin-bottom:6px">GLOBAL DOM</div>
+        <table>
+          <thead><tr><th>#</th><th>DOM</th><th>ADV</th></tr></thead>
+          <tbody id="dgBody"></tbody>
+        </table>
+      </div>
+      <div>
+        <div class="label" style="margin-bottom:6px">GLOBAL EXT</div>
+        <table>
+          <thead><tr><th>#</th><th>EXT</th><th>ADV</th></tr></thead>
+          <tbody id="egBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- AJUSTEMENT MANUEL -->
+  <div class="card">
+    <div class="label">4) 🎛️ Ajustement contextuel manuel <span class="badge new">NOUVEAU V5</span></div>
+    <div class="mini">Corrige le μ brut selon tes infos terrain. <b>Positif = avantage DOM</b>, <b>négatif = avantage EXT</b>.<br>Exemples : absence d'un titulaire, back-to-back, motivation spéciale…</div>
+    <div class="adj-grid">
+      <div class="adj-side">
+        <div class="label">Facteur DOM</div>
+        <div class="adj-input-row">
+          <button class="adj-btn" onclick="adjStep('dom',-0.5)">−</button>
+          <div class="adj-val" id="adjDomVal">0.0</div>
+          <button class="adj-btn" onclick="adjStep('dom',+0.5)">+</button>
+        </div>
+        <div class="presets">
+          <button class="preset-btn red-p" onclick="adjPreset('dom',-4)">Absent titulaire −4</button>
+          <button class="preset-btn red-p" onclick="adjPreset('dom',-3)">Back-to-back −3</button>
+          <button class="preset-btn red-p" onclick="adjPreset('dom',-2)">Fatigue −2</button>
+          <button class="preset-btn green-p" onclick="adjPreset('dom',+2)">Domicile chaud +2</button>
+          <button class="preset-btn green-p" onclick="adjPreset('dom',+3)">Retour blessé +3</button>
+        </div>
+      </div>
+      <div class="adj-side">
+        <div class="label">Facteur EXT</div>
+        <div class="adj-input-row">
+          <button class="adj-btn" onclick="adjStep('ext',-0.5)">−</button>
+          <div class="adj-val" id="adjExtVal">0.0</div>
+          <button class="adj-btn" onclick="adjStep('ext',+0.5)">+</button>
+        </div>
+        <div class="presets">
+          <button class="preset-btn red-p" onclick="adjPreset('ext',-4)">Absent titulaire −4</button>
+          <button class="preset-btn red-p" onclick="adjPreset('ext',-3)">Back-to-back −3</button>
+          <button class="preset-btn red-p" onclick="adjPreset('ext',-2)">Fatigue −2</button>
+          <button class="preset-btn green-p" onclick="adjPreset('ext',+2)">Forme +2</button>
+          <button class="preset-btn green-p" onclick="adjPreset('ext',+3)">Retour blessé +3</button>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px">
+      <div style="flex:1;background:#0D1525;border:1px solid var(--line);border-radius:10px;padding:8px;font-size:12px;text-align:center">
+        <div style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.12em">Ajustement net sur μ</div>
+        <div id="adjNetVal" style="font-size:20px;font-weight:900;margin-top:2px">0.0 pts</div>
+        <div style="color:var(--muted);font-size:10px;margin-top:2px">= DOM − EXT</div>
+      </div>
+      <button class="btn secondary" style="margin-top:0;width:auto;padding:8px 16px;font-size:12px" onclick="resetAdj()">🔄 Reset</button>
+    </div>
+  </div>
+
+  <!-- SCANNER -->
+  <div class="card">
+    <div class="label">5) Scanner Pinnacle — lignes + cotes</div>
+    <div class="mini">Pour chaque ligne, entre la <b>cote du favori (-)</b> et la <b>cote de l'underdog (+)</b>.</div>
+    <div class="row" style="margin-top:10px">
+      <div class="col">
+        <div class="label" style="margin-bottom:6px">Générer des lignes</div>
+        <div class="row">
+          <div class="col"><input inputmode="decimal" type="number" step="0.5" id="scanStart" placeholder="Début" value="4.0" oninput="noop()"></div>
+          <div class="col"><input inputmode="decimal" type="number" step="0.5" id="scanEnd" placeholder="Fin" value="10.0" oninput="noop()"></div>
+          <div class="col"><input inputmode="decimal" type="number" step="0.5" id="scanStep" placeholder="Pas" value="0.5" oninput="noop()"></div>
+        </div>
+        <button class="btn" onclick="generateLines()">⚡ Générer</button>
+        <button class="btn secondary" onclick="clearLines()">🗑️ Vider</button>
+      </div>
+      <div class="col">
+        <div class="mini" style="margin-top:10px">Tu peux entrer 5 à 9 lignes autour de la mainline Pinnacle.</div>
+      </div>
+    </div>
+    <div class="sep"></div>
+    <div style="margin-bottom:10px">
+      <div class="label" style="margin-bottom:6px">📋 Coller bloc ps3838 <span class="badge new">AUTO</span></div>
+      <div class="mini" style="margin-bottom:8px">Colle le bloc complet copié de ps3838 (HDP + OU mélangés) — le parseur garde uniquement les lignes HDP.</div>
+      <textarea id="ps3838Paste" rows="4" placeholder="Colle ici le bloc brut ps3838" style="width:100%;background:#0D1525;border:1px solid var(--amber);border-radius:10px;color:var(--ink);padding:9px;font-size:12px;font-family:monospace;outline:none;resize:vertical"></textarea>
+      <button class="btn amber-btn" style="margin-top:6px" onclick="parsePs3838Block()">⚡ Extraire lignes HDP</button>
+      <div id="ps3838Status" style="font-size:11px;font-family:monospace;margin-top:6px;min-height:14px"></div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Ligne</th>
+          <th>Cote Fav</th>
+          <th>Cote Dog</th>
+          <th>P cover</th>
+          <th>EV Fav</th>
+          <th>EV Dog</th>
+          <th>Pick</th>
+        </tr>
+      </thead>
+      <tbody id="lineBody"></tbody>
+    </table>
+    <div class="hint">Mise à jour automatique.</div>
+  </div>
+
+
+  <!-- RÉSULTATS -->
+  <div class="card">
+    <div class="label">6) Résultats</div>
+    <div class="warn-banner" id="warnSample"></div>
+    <div class="kpi" style="margin-top:8px">
+      <div class="k">
+        <div class="t">Score estimé</div>
+        <div class="v" id="scoreEst">—</div>
+        <div class="s" id="scoreSub">—</div>
+      </div>
+      <div class="k">
+        <div class="t">μ brut → ajusté</div>
+        <div class="v" id="muVal">—</div>
+        <div class="s">DOM − EXT</div>
+      </div>
+      <div class="k">
+        <div class="t">Volatilité σ</div>
+        <div class="v" id="sigmaVal">—</div>
+        <div class="s" id="sigmaSub">écarts passés</div>
+        <div class="sigma-meter"><div class="sigma-fill" id="sigmaFill" style="width:0%"></div></div>
+      </div>
+      <div class="k">
+        <div class="t">True Line</div>
+        <div class="v" id="trueLine">—</div>
+        <div class="s">ligne modèle</div>
+      </div>
+      <div class="k">
+        <div class="t">Pace moyen</div>
+        <div class="v" id="paceVal">—</div>
+        <div class="s" id="paceSub">rythme approx.</div>
+      </div>
+    </div>
+    <div class="sep"></div>
+    <div class="canvasCard">
+      <div class="label">Monte-Carlo — distribution des marges (DOM−EXT)</div>
+      <canvas id="hist" style="border-radius:10px;background:#0D1525;border:1px solid var(--line)"></canvas>
+      <div class="hint" id="mcHint">—</div>
+    </div>
+    <div class="verdict" id="verdict">Remplis l'étape 3 + au moins 1 ligne.</div>
+    <div class="copy">
+      <button class="copyBtn" id="copyBtn" onclick="copyBest()">📋 Copier le bet (meilleure ligne)</button>
+      <div class="hint copy small" id="copyHint">Rien n'est envoyé automatiquement.</div>
+    </div>
+  </div>
+  </div><!-- end calcSection -->
+</div>
+
+<script>
+  const N = 5;
+  const MC_N = 20000;
+  const RECENCY_WEIGHTS = [1.0, 0.85, 0.70, 0.55, 0.40];
+  const LEAGUE_PACE_BASE = 165.0;
+  let favSide = 'dom';
+  let stableMode = false;
+  let modeGlobalOnly = false;
+  let recencyMode = false;
+  let adjDom = 0, adjExt = 0;
+
+  function noop(){}
+
+  // ── Favori ──────────────────────────────────────────
+  function setFav(side){
+    favSide = side;
+    document.getElementById('favDomBtn').classList.toggle('active', side==='dom');
+    document.getElementById('favExtBtn').classList.toggle('active', side==='ext');
+    recalc();
+  }
+
+  // ── Mode Stable ──────────────────────────────────────
+  function setStable(on){
+    stableMode = !!on;
+    document.getElementById('stableOff').classList.toggle('active', !stableMode);
+    document.getElementById('stableOn').classList.toggle('active', stableMode);
+    try{ localStorage.setItem('hdp_v5_stable', stableMode ? '1':'0'); }catch(e){}
+    recalc();
+  }
+
+  // ── Mode Global ──────────────────────────────────────
+  function setModeGlobal(on){
+    modeGlobalOnly = !!on;
+    document.getElementById('modeCtxBtn').classList.toggle('active', !modeGlobalOnly);
+    document.getElementById('modeGlobBtn').classList.toggle('active', modeGlobalOnly);
+    try{ localStorage.setItem('hdp_v5_modeGlobal', modeGlobalOnly ? '1':'0'); }catch(e){}
+    recalc();
+  }
+
+  // ── Mode Récence ─────────────────────────────────────
+  function setRecency(on){
+    recencyMode = !!on;
+    document.getElementById('recencyOff').classList.toggle('active', !recencyMode);
+    document.getElementById('recencyOn').classList.toggle('active', recencyMode);
+    try{ localStorage.setItem('hdp_v5_recency', recencyMode ? '1':'0'); }catch(e){}
+    recalc();
+  }
+
+  // ── Ajustements manuels ──────────────────────────────
+  function adjStep(side, delta){
+    if(side === 'dom') adjDom = Math.round((adjDom + delta)*10)/10;
+    else adjExt = Math.round((adjExt + delta)*10)/10;
+    updateAdjUI();
+    recalc();
+  }
+  function adjPreset(side, val){
+    if(side === 'dom') adjDom = val;
+    else adjExt = val;
+    updateAdjUI();
+    recalc();
+  }
+  function resetAdj(){
+    adjDom = 0; adjExt = 0;
+    updateAdjUI();
+    recalc();
+  }
+  function updateAdjUI(){
+    const dEl = document.getElementById('adjDomVal');
+    const eEl = document.getElementById('adjExtVal');
+    const net = adjDom - adjExt;
+    dEl.textContent = (adjDom >= 0 ? '+' : '') + adjDom.toFixed(1);
+    dEl.className = 'adj-val' + (adjDom > 0 ? ' pos' : adjDom < 0 ? ' neg' : '');
+    eEl.textContent = (adjExt >= 0 ? '+' : '') + adjExt.toFixed(1);
+    eEl.className = 'adj-val' + (adjExt > 0 ? ' pos' : adjExt < 0 ? ' neg' : '');
+    const netEl = document.getElementById('adjNetVal');
+    netEl.textContent = (net >= 0 ? '+' : '') + net.toFixed(1) + ' pts';
+    netEl.style.color = net > 0 ? 'var(--green)' : net < 0 ? 'var(--red)' : 'var(--ink)';
+  }
+
+  // ── Rows ─────────────────────────────────────────────
+  function makeRows(){
+    const wLabels = ['×1.00','×0.85','×0.70','×0.55','×0.40'];
+    const wClasses = ['w1','w2','w3','w4','w5'];
+    ['dBody','eBody','dgBody','egBody'].forEach((id, bi) => {
+      const el = document.getElementById(id);
+      if(!el) return;
+      el.innerHTML = '';
+      const isD = (bi===0||bi===2);
+      const prefix = ['d','e','dg','eg'][bi];
+      const lbl = isD ? 'DOM' : 'EXT';
+      for(let i=1;i<=N;i++){
+        el.innerHTML += `<tr>
+          <td class="mini">${i}<span class="w-badge ${wClasses[i-1]}">${wLabels[i-1]}</span></td>
+          <td><input inputmode="decimal" type="number" id="${prefix}_m_${i}" placeholder="${lbl}" oninput="recalc()"></td>
+          <td><input inputmode="decimal" type="number" id="${prefix}_a_${i}" placeholder="ADV" oninput="recalc()"></td>
+        </tr>`;
+      }
+    });
+  }
+
+  // ── Stats math ───────────────────────────────────────
+  function mean(arr){ return arr.reduce((a,b)=>a+b,0)/arr.length; }
+  function weightedMean(arr, weights){
+    let sw=0, wsum=0;
+    for(let i=0;i<arr.length;i++){ wsum+=arr[i]*weights[i]; sw+=weights[i]; }
+    return wsum/sw;
+  }
+  function std(arr){
+    if(arr.length<2) return NaN;
+    const m = mean(arr);
+    return Math.sqrt(arr.reduce((s,x)=>s+(x-m)*(x-m),0)/(arr.length-1));
+  }
+
+  function readTeam(prefix){
+    const scored=[], allowed=[], margins=[], paces=[], ws=[];
+    for(let i=1;i<=N;i++){
+      const mEl = document.getElementById(prefix+'_m_'+i);
+      const aEl = document.getElementById(prefix+'_a_'+i);
+      if(!mEl||!aEl) continue;
+      const m = parseFloat(mEl.value);
+      const a = parseFloat(aEl.value);
+      if(!isNaN(m) && !isNaN(a)){
+        scored.push(m); allowed.push(a); margins.push(m-a); paces.push(m+a); ws.push(RECENCY_WEIGHTS[i-1]);
+      }
+    }
+    if(scored.length===0) return null;
+    const sAvg = recencyMode ? weightedMean(scored, ws) : mean(scored);
+    const aAvg = recencyMode ? weightedMean(allowed, ws) : mean(allowed);
+    const pAvg = recencyMode ? weightedMean(paces, ws) : mean(paces);
+    return {scored, allowed, scoredAvg:sAvg, allowedAvg:aAvg, paceAvg:pAvg, margins, n:scored.length};
+  }
+
+  // ── Normal math ──────────────────────────────────────
+  function erf(x){
+    const sign=x>=0?1:-1; x=Math.abs(x);
+    const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
+    const t=1/(1+p*x);
+    return sign*(1-((((a5*t+a4)*t+a3)*t+a2)*t+a1)*t*Math.exp(-x*x));
+  }
+  function normCdf(x){ return 0.5*(1+erf(x/Math.SQRT2)); }
+  function randn(){
+    let u=0,v=0;
+    while(u===0) u=Math.random();
+    while(v===0) v=Math.random();
+    return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+  }
+
+  // ── Histogram ────────────────────────────────────────
+  function drawHistogram(samples, mu){
+    const canvas = document.getElementById('hist');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width = canvas.clientWidth * devicePixelRatio;
+    const H = canvas.height = canvas.clientHeight * devicePixelRatio;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#0D1525'; ctx.fillRect(0,0,W,H);
+    if(!samples||samples.length===0){
+      ctx.fillStyle='#94A3B8'; ctx.font=`${14*devicePixelRatio}px system-ui`;
+      ctx.fillText('—', 10*devicePixelRatio, 24*devicePixelRatio);
+      return;
+    }
+    const min=Math.min(...samples), max=Math.max(...samples);
+    const pad=2, lo=Math.floor(min)-pad, hi=Math.ceil(max)+pad;
+    const bins=28, step=(hi-lo)/bins;
+    const counts=new Array(bins).fill(0);
+    for(const x of samples){
+      const idx=Math.max(0,Math.min(bins-1,Math.floor((x-lo)/step)));
+      counts[idx]++;
+    }
+    const maxC=Math.max(...counts);
+    const left=28*devicePixelRatio, right=10*devicePixelRatio, top=12*devicePixelRatio, bot=26*devicePixelRatio;
+    const plotW=W-left-right, plotH=H-top-bot;
+    ctx.strokeStyle='#1F2D3D'; ctx.lineWidth=2*devicePixelRatio;
+    ctx.beginPath(); ctx.moveTo(left,top); ctx.lineTo(left,top+plotH); ctx.lineTo(left+plotW,top+plotH); ctx.stroke();
+    const barW=plotW/bins;
+    for(let i=0;i<bins;i++){
+      const binMid = lo + (i+0.5)*step;
+      let color = '#1565C0';
+      if(mu !== undefined){
+        if(Math.abs(binMid - mu) < step) color = '#00C896';
+        else if(binMid < 0) color = '#8B5CF644';
+      }
+      const h=(counts[i]/maxC)*plotH;
+      ctx.fillStyle=color;
+      ctx.fillRect(left+i*barW, top+plotH-h, barW*0.9, h);
+    }
+    // zero line
+    const zeroX = left + (0-lo)/step * barW;
+    if(zeroX>left && zeroX<left+plotW){
+      ctx.strokeStyle='#FF4D4D88'; ctx.lineWidth=2*devicePixelRatio;
+      ctx.setLineDash([4*devicePixelRatio,4*devicePixelRatio]);
+      ctx.beginPath(); ctx.moveTo(zeroX,top); ctx.lineTo(zeroX,top+plotH); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.fillStyle='#94A3B8'; ctx.font=`${11*devicePixelRatio}px system-ui`;
+    ctx.fillText('DOM − EXT', left, H-8*devicePixelRatio);
+  }
+
+  function formatSigned(x){ return (!isFinite(x))? '—' : (x>=0?'+':'')+x.toFixed(1); }
+
+  // ── Lines ────────────────────────────────────────────
+
+  function parsePs3838Block(){
+    const raw = document.getElementById('ps3838Paste').value.trim();
+    const status = document.getElementById('ps3838Status');
+    if(!raw){ status.textContent='Aucun contenu.'; status.style.color='var(--red)'; return; }
+
+    const tokens = raw.split(/\s+/).map(t=>t.trim()).filter(t=>t.length>0);
+    // On ignore les tokens qui sont O, U, 1, 2 (marqueurs ps3838)
+    // Un spread HDP: nombre avec signe (-13.5) ou sans (13.5), valeur abs <= 35
+    // Une cote: nombre entre 1.3 et 3.5 avec décimales
+    // Structure répétée: spread_fav, cote_fav, [1 ou 2], spread_dog, cote_dog, [O, ou_line, ou_cote, U, ou_line, ou_cote]
+
+    const hdpLines = [];
+    let i = 0;
+    while(i < tokens.length){
+      const t = tokens[i];
+      // Cherche un spread négatif (fav)
+      const spreadMatch = t.match(/^-?(\d+\.?\d*)$/);
+      if(!spreadMatch){ i++; continue; }
+      const val = parseFloat(t);
+      // Un spread HDP: valeur abs entre 0.5 et 35
+      if(Math.abs(val) < 0.5 || Math.abs(val) > 35 || ['1','2'].includes(t)){ i++; continue; }
+      // Vérifie si c'est une cote OU (valeur > 100 = total basket)
+      if(Math.abs(val) > 40){ i++; continue; }
+
+      // Si négatif: c'est le spread fav
+      if(val < 0){
+        const spreadFav = Math.abs(val);
+        // Cherche cote fav juste après (en ignorant 1/2)
+        let j = i+1;
+        while(j < tokens.length && ['1','2'].includes(tokens[j])) j++;
+        if(j >= tokens.length){ i++; continue; }
+        const coteFav = parseFloat(tokens[j]);
+        if(isNaN(coteFav) || coteFav < 1.3 || coteFav > 3.5){ i++; continue; }
+
+        // Cherche spread dog (valeur positive égale)
+        let k = j+1;
+        while(k < tokens.length && ['1','2'].includes(tokens[k])) k++;
+        if(k >= tokens.length){ i++; continue; }
+        const spreadDogRaw = parseFloat(tokens[k]);
+        if(isNaN(spreadDogRaw) || Math.abs(spreadDogRaw - spreadFav) > 0.5){ i++; continue; }
+
+        // Cherche cote dog
+        let l = k+1;
+        while(l < tokens.length && ['1','2'].includes(tokens[l])) l++;
+        if(l >= tokens.length){ i++; continue; }
+        const coteDog = parseFloat(tokens[l]);
+        if(isNaN(coteDog) || coteDog < 1.3 || coteDog > 3.5){ i++; continue; }
+
+        hdpLines.push({ line: spreadFav, coteFav, coteDog });
+        i = l + 1;
+      } else {
+        i++;
+      }
+    }
+
+    if(hdpLines.length === 0){
+      status.textContent = '❌ Aucune ligne HDP trouvée. Vérifie le format.';
+      status.style.color = 'var(--red)';
+      return;
+    }
+
+    // Vide le tableau et remplit avec les lignes HDP
+    document.getElementById('lineBody').innerHTML = '';
+    hdpLines.forEach(l => {
+      addLineRow(l.line);
+      const rows = document.querySelectorAll('#lineBody tr');
+      const lastRow = rows[rows.length-1];
+      const inputs = lastRow.querySelectorAll('input');
+      inputs[1].value = l.coteFav.toFixed(3);
+      inputs[2].value = l.coteDog.toFixed(3);
+    });
+    recalc();
+
+    status.textContent = '✅ ' + hdpLines.length + ' lignes HDP extraites (OU ignorées)';
+    status.style.color = 'var(--green)';
+  }
+
+  function clearLines(){ document.getElementById('lineBody').innerHTML=''; recalc(); }
+  function generateLines(){
+    const start=parseFloat(document.getElementById('scanStart').value);
+    const end=parseFloat(document.getElementById('scanEnd').value);
+    const step=parseFloat(document.getElementById('scanStep').value);
+    const body=document.getElementById('lineBody');
+    body.innerHTML='';
+    if(isNaN(start)||isNaN(end)||isNaN(step)||step<=0) return;
+    for(let l=start;l<=end+1e-9;l+=step) addLineRow(l);
+    recalc();
+  }
+  function addLineRow(lineVal){
+    const body=document.getElementById('lineBody');
+    const id='L'+Math.random().toString(16).slice(2);
+    body.insertAdjacentHTML('beforeend',`
+      <tr data-id="${id}">
+        <td><input inputmode="decimal" type="number" step="0.5" value="${Number(lineVal).toFixed(1)}" oninput="recalc()"></td>
+        <td><input inputmode="decimal" type="number" step="0.001" placeholder="1.91" oninput="recalc()"></td>
+        <td><input inputmode="decimal" type="number" step="0.001" placeholder="1.91" oninput="recalc()"></td>
+        <td class="mini" data-k="p">—</td>
+        <td class="mini" data-k="evf">—</td>
+        <td class="mini" data-k="evd">—</td>
+        <td class="mini" data-k="pick">—</td>
+      </tr>`);
+  }
+
+  // ── MAIN RECALC ──────────────────────────────────────
+  function recalc(){
+    const dCtx=readTeam('d'), eCtx=readTeam('e');
+    const dG=readTeam('dg'), eG=readTeam('eg');
+
+    // Sample warnings
+    const wCtx = document.getElementById('warnCtx');
+    const wSample = document.getElementById('warnSample');
+    let warnMsg = '';
+    if(dCtx && dCtx.n < 3) warnMsg += `⚠️ DOM : seulement ${dCtx.n} match(s) — sigma peu fiable. `;
+    if(eCtx && eCtx.n < 3) warnMsg += `⚠️ EXT : seulement ${eCtx.n} match(s) — sigma peu fiable.`;
+    wCtx.textContent = warnMsg;
+    wCtx.classList.toggle('show', warnMsg.length > 0);
+
+    const hasCtx=(dCtx&&eCtx&&dCtx.n>=2&&eCtx.n>=2)||(modeGlobalOnly&&dG&&eG&&dG.n>=3&&eG.n>=3);
+    if(!hasCtx){
+      document.getElementById('scoreEst').textContent='—';
+      document.getElementById('scoreSub').textContent='Remplis DOM + EXT (min 2 lignes chacun).';
+      document.getElementById('muVal').textContent='—';
+      document.getElementById('sigmaVal').textContent='—';
+      document.getElementById('trueLine').textContent='—';
+      document.getElementById('paceVal').textContent='—';
+      document.getElementById('paceSub').textContent='rythme approx.';
+      document.getElementById('mcHint').textContent='—';
+      document.getElementById('sigmaFill').style.width='0%';
+      document.getElementById('verdict').className='verdict';
+      document.getElementById('verdict').textContent="Remplis l'étape 3 + au moins 1 ligne.";
+      wSample.classList.remove('show');
+      [...document.querySelectorAll('#lineBody tr')].forEach(tr=>{
+        tr.querySelector('[data-k="p"]').textContent='—';
+        tr.querySelector('[data-k="evf"]').textContent='—';
+        tr.querySelector('[data-k="evd"]').textContent='—';
+        tr.querySelector('[data-k="pick"]').textContent='—';
+      });
+      drawHistogram([]);
+      return;
+    }
+
+    const canStable=stableMode&&hasCtx&&dG&&eG&&dG.n>=3&&eG.n>=3;
+    let d=dCtx, e=eCtx;
+    if(modeGlobalOnly&&dG&&eG&&dG.n>=3&&eG.n>=3){
+      d=dG; e=eG;
+    } else if(canStable){
+      const dSc=dCtx.scored.concat(dG.scored);
+      const dAl=dCtx.allowed.concat(dG.allowed);
+      const eSc=eCtx.scored.concat(eG.scored);
+      const eAl=eCtx.allowed.concat(eG.allowed);
+      d={scoredAvg:mean(dSc),allowedAvg:mean(dAl),paceAvg:mean(dSc.map((x,i)=>x+(dAl[i]??0))),margins:dCtx.margins.concat(dG.margins),n:dSc.length};
+      e={scoredAvg:mean(eSc),allowedAvg:mean(eAl),paceAvg:mean(eSc.map((x,i)=>x+(eAl[i]??0))),margins:eCtx.margins.concat(eG.margins),n:eSc.length};
+    }
+
+    const paceDom = isFinite(d.paceAvg) ? d.paceAvg : LEAGUE_PACE_BASE;
+    const paceExt = isFinite(e.paceAvg) ? e.paceAvg : LEAGUE_PACE_BASE;
+    const matchPace = (paceDom + paceExt) / 2;
+    const paceDelta = Math.abs(paceDom - paceExt);
+
+    const attDomAdj = d.scoredAvg * (LEAGUE_PACE_BASE / paceDom);
+    const defDomAdj = d.allowedAvg * (LEAGUE_PACE_BASE / paceDom);
+    const attExtAdj = e.scoredAvg * (LEAGUE_PACE_BASE / paceExt);
+    const defExtAdj = e.allowedAvg * (LEAGUE_PACE_BASE / paceExt);
+
+    const scoreDomBase = (attDomAdj + defExtAdj) / 2;
+    const scoreExtBase = (attExtAdj + defDomAdj) / 2;
+    const paceFactor = matchPace / LEAGUE_PACE_BASE;
+    const scoreDom = scoreDomBase * paceFactor;
+    const scoreExt = scoreExtBase * paceFactor;
+
+    let muRaw=scoreDom-scoreExt;
+    if(modeGlobalOnly) muRaw+=2.5;
+
+    // Apply manual adjustments
+    const muAdj = muRaw + adjDom - adjExt;
+    const hasAdj = (adjDom !== 0 || adjExt !== 0);
+
+    const sigmaRaw=std((d.margins||[]).concat(e.margins||[]));
+    const paceSigmaBoost = Math.min(2.0, paceDelta / 20);
+    const sigmaUsed=Math.max((isFinite(sigmaRaw)?sigmaRaw:10.0) + paceSigmaBoost, 9.0);
+    const totalN = (d.n||0) + (e.n||0);
+
+    // Sigma quality meter (9=best → 14+=bad)
+    const sigmaFillPct = Math.max(0, Math.min(100, (sigmaUsed-9)/(15-9)*100));
+    const sigmaFillEl = document.getElementById('sigmaFill');
+    sigmaFillEl.style.width = sigmaFillPct + '%';
+    sigmaFillEl.style.background = sigmaUsed<=10.5 ? 'var(--green)' : sigmaUsed<=12 ? 'var(--amber)' : 'var(--red)';
+
+    document.getElementById('scoreEst').textContent=`${scoreDom.toFixed(1)} — ${scoreExt.toFixed(1)}`;
+    let subLabel = modeGlobalOnly ? 'MODE GLOBAL ✅ (+2.5 dom)' : canStable ? 'MODE STABLE ✅ (5+5)' : 'Contexte uniquement';
+    if(recencyMode) subLabel += ' ⚖️';
+    document.getElementById('scoreSub').textContent=subLabel;
+
+    const muLabel = hasAdj
+      ? `${formatSigned(muRaw)} → ${formatSigned(muAdj)} pts`
+      : formatSigned(muAdj) + ' pts';
+    document.getElementById('muVal').textContent=muLabel;
+    document.getElementById('muVal').style.color = hasAdj ? 'var(--amber)' : 'var(--ink)';
+
+    document.getElementById('sigmaVal').textContent=sigmaUsed.toFixed(1)+' pts';
+    document.getElementById('sigmaVal').style.color = sigmaUsed<=10.5 ? 'var(--green)' : sigmaUsed<=12 ? 'var(--amber)' : 'var(--red)';
+
+    const trueFav=muAdj>=0?'DOM':'EXT';
+    const trueAbs=Math.abs(muAdj);
+    document.getElementById('trueLine').textContent=`${trueFav} -${trueAbs.toFixed(1)}`;
+    document.getElementById('paceVal').textContent=`${matchPace.toFixed(1)}`;
+    document.getElementById('paceSub').textContent=`DOM ${paceDom.toFixed(1)} • EXT ${paceExt.toFixed(1)}`;
+
+
+    // Sample size warning
+    let sWarn = '';
+    if(totalN < 6) sWarn = `⚠️ Seulement ${totalN} matchs au total — sigma peu fiable. Résultats à interpréter avec prudence.`;
+    wSample.textContent = sWarn;
+    wSample.classList.toggle('show', sWarn.length > 0);
+
+    // Monte Carlo
+    const samples=[];
+    for(let i=0;i<MC_N;i++) samples.push(muAdj+sigmaUsed*randn());
+    drawHistogram(samples, muAdj);
+    document.getElementById('mcHint').textContent=
+      `Monte-Carlo: ${MC_N} simul • μ=${formatSigned(muAdj)}${hasAdj?' (ajusté)':''} • σ=${sigmaUsed.toFixed(1)}${isFinite(sigmaRaw)?` (brut ${sigmaRaw.toFixed(1)})`:''} • pace=${matchPace.toFixed(1)} • Δpace=${paceDelta.toFixed(1)} • n=${totalN}`;
+
+    // Lines
+    const rows=[...document.querySelectorAll('#lineBody tr')];
+    let best=null;
+    rows.forEach(tr=>{
+      const inputs=tr.querySelectorAll('input');
+      const L=parseFloat(inputs[0].value);
+      const oddsFav=parseFloat(inputs[1].value);
+      const oddsDog=parseFloat(inputs[2].value);
+      const pCell=tr.querySelector('[data-k="p"]');
+      const evfCell=tr.querySelector('[data-k="evf"]');
+      const evdCell=tr.querySelector('[data-k="evd"]');
+      const pickCell=tr.querySelector('[data-k="pick"]');
+      if(isNaN(L)||L<=0||!isFinite(sigmaUsed)){
+        pCell.textContent='—'; evfCell.textContent='—'; evdCell.textContent='—'; pickCell.textContent='—';
+        return;
+      }
+      let pFavCover;
+      if(favSide==='dom') pFavCover=1-normCdf((L-muAdj)/sigmaUsed);
+      else pFavCover=normCdf((-L-muAdj)/sigmaUsed);
+      pFavCover=Math.min(0.9999,Math.max(0.0001,pFavCover));
+      const pDogCover=1-pFavCover;
+      pCell.textContent=`${(pFavCover*100).toFixed(1)}%`;
+      let evFav=NaN, evDog=NaN;
+      if(!isNaN(oddsFav)&&oddsFav>1){
+        evFav=pFavCover*oddsFav-1;
+        evfCell.textContent=`${(evFav*100).toFixed(1)}%`;
+        evfCell.className='mini '+(evFav>=0.03?'good':evFav>=0.01?'warn':evFav>-0.01?'':'bad');
+      }else{ evfCell.textContent='—'; evfCell.className='mini'; }
+      if(!isNaN(oddsDog)&&oddsDog>1){
+        evDog=pDogCover*oddsDog-1;
+        evdCell.textContent=`${(evDog*100).toFixed(1)}%`;
+        evdCell.className='mini '+(evDog>=0.03?'good':evDog>=0.01?'warn':evDog>-0.01?'':'bad');
+      }else{ evdCell.textContent='—'; evdCell.className='mini'; }
+      let pick='—', pickSide=null, pickEv=NaN, pickOdds=NaN, pickP=NaN;
+      if(isFinite(evFav)&&isFinite(evDog)){
+        if(evFav>=evDog){ pick=`FAV (-${L.toFixed(1)})`; pickSide='fav'; pickEv=evFav; pickOdds=oddsFav; pickP=pFavCover; }
+        else{ pick=`DOG (+${L.toFixed(1)})`; pickSide='dog'; pickEv=evDog; pickOdds=oddsDog; pickP=pDogCover; }
+      }else if(isFinite(evFav)){ pick=`FAV (-${L.toFixed(1)})`; pickSide='fav'; pickEv=evFav; pickOdds=oddsFav; pickP=pFavCover; }
+      else if(isFinite(evDog)){ pick=`DOG (+${L.toFixed(1)})`; pickSide='dog'; pickEv=evDog; pickOdds=oddsDog; pickP=pDogCover; }
+      pickCell.textContent=pick;
+      if(pickSide&&isFinite(pickEv)&&(!best||pickEv>best.ev)){
+        const team=(pickSide==='fav')?(favSide==='dom'?'DOM':'EXT'):(favSide==='dom'?'EXT':'DOM');
+        const sign=(pickSide==='fav')?'-':'+';
+        best={ev:pickEv, side:pickSide, line:L, odds:pickOdds, p:pickP, team,
+          label:`${team} ${sign}${L.toFixed(1)} @${pickOdds.toFixed(3)}`};
+      }
+    });
+
+    const v=document.getElementById('verdict');
+    if(!best){
+      v.className='verdict'; v.textContent="Ajoute au moins 1 ligne + cotes pour voir EV et Best Pick."; return;
+    }
+    const evPct=best.ev*100;
+    const pCover=best.p*100;
+
+    // ── V5 Verdict: sigma-adjusted quality ──────────────
+    // Sigma penalty: σ<=10 = 0, σ=12 = 0.01, σ>=14 = 0.03
+    const sigmaPenalty = Math.max(0, (sigmaUsed - 10) * 0.005);
+    const effectiveEv = best.ev - sigmaPenalty;
+    const samplePenalty = totalN < 6;
+
+    let quality='bad';
+    if(effectiveEv>=0.05 && best.p>=0.58 && !samplePenalty){
+      quality='good';
+    } else if(effectiveEv>=0.03 && best.p>=0.55){
+      quality='warn';
+    }
+
+    v.className=`verdict ${quality}`;
+    const sigmaNote = sigmaPenalty > 0 ? ` • σ-penalty: -${(sigmaPenalty*100).toFixed(1)}%` : '';
+    const adjNote = hasAdj ? ` • adj: ${formatSigned(adjDom-adjExt)}pts` : '';
+    const recNote = recencyMode ? ' ⚖️' : '';
+    const marketNote = isFinite(marketEdge) ? ` • Δmarché: ${marketEdge>=0?'+':''}${marketEdge.toFixed(1)}pts${Math.abs(marketEdge)>=2?(marketEdge>=2?' ✅':' ❤'):''}` : '';
+    const driftNote = isFinite(marketDrift) && Math.abs(marketDrift)>=0.5 ? ` (drift ${marketDrift>=0?'+':''}${marketDrift.toFixed(1)})` : '';
+    if(quality==='good') v.textContent=`✅ VALUE — ${best.label} • EV ${evPct.toFixed(1)}% • P ${pCover.toFixed(1)}%${sigmaNote}${adjNote}${marketNote}${driftNote}${recNote}`;
+    else if(quality==='warn') v.textContent=`⚠️ BORDERLINE — ${best.label} • EV ${evPct.toFixed(1)}% • P ${pCover.toFixed(1)}%${sigmaNote}${adjNote}${marketNote}${driftNote}${recNote}`;
+    else v.textContent=`❌ PASS — ${best.label} • EV ${evPct.toFixed(1)}% • P ${pCover.toFixed(1)}%${sigmaNote}${adjNote}${marketNote}${driftNote}${recNote}`;
+    v.textContent += `  |  TrueLine: ${trueFav} -${trueAbs.toFixed(1)}  σ=${sigmaUsed.toFixed(1)}`;
+    window.__bestPick=best;
+    window.__muAdj=muAdj;
+    window.__sigmaUsed=sigmaUsed;
+    window.__adjNote=adjNote;
+    window.__marketEdge=marketEdge;
+    window.__marketDrift=marketDrift;
+  }
+
+  // ── Copy best ────────────────────────────────────────
+  function copyBest(){
+    const btn=document.getElementById('copyBtn');
+    const hint=document.getElementById('copyHint');
+    const b=window.__bestPick;
+    if(!b){ hint.textContent="Rien à copier."; return; }
+    const adjLine = window.__adjNote ? `\nAjustement: ${window.__adjNote}` : '';
+    const mEdge = window.__marketEdge;
+    const mDrift = window.__marketDrift;
+    const marketLine = isFinite(mEdge) ? `\n∆ Marché/Modèle: ${mEdge>=0?'+':''}${mEdge.toFixed(1)} pts${isFinite(mDrift)?' | Drift: '+(mDrift>=0?'+':'')+mDrift.toFixed(1)+' pts':''}` : '';
+    const txt=`HDP V5
+Pick: ${b.label}
+P(cover): ${(b.p*100).toFixed(1)}%
+EV: ${(b.ev*100).toFixed(1)}%
+μ ajusté: ${formatSigned(window.__muAdj)} pts | σ: ${(window.__sigmaUsed||0).toFixed(1)} pts${adjLine}${marketLine}
+Mode: ${favSide.toUpperCase()} favori | True line: ${document.getElementById('trueLine').textContent}`;
+    navigator.clipboard.writeText(txt).then(()=>{
+      btn.classList.add('copied'); btn.textContent='✅ Copié !';
+      setTimeout(()=>{btn.classList.remove('copied'); btn.textContent='📋 Copier le bet (meilleure ligne)';},1200);
+    }).catch(()=>{ hint.textContent="Impossible de copier. Sélectionne manuellement."; });
+  }
+
+
+  // ── API-Sports ───────────────────────────────────────
+  const APISPORT_KEY='a338395d6fb46b3052c5bde38bc80b2';
+  const APISPORT_BASE='https://v1.basketball.api-sports.io/';
+  let selectedDomTeam=null, selectedExtTeam=null;
+
+  async function tsdbFetch(path){
+    const url=APISPORT_BASE+path;
+    const res=await fetch(url,{headers:{'x-apisports-key':APISPORT_KEY}});
+    if(res.ok) return await res.json();
+    throw new Error('HTTP '+res.status);
+  }
+
+  async function tsdbSearchCandidates(name){
+    const data=await tsdbFetch('teams?search='+encodeURIComponent(name));
+    return (data.response||[]).slice(0,5);
+  }
+
+  async function tsdbGetLast5(teamId){
+    const data=await tsdbFetch('games?team='+teamId+'&last=5');
+    return data.response||[];
+  }
+
+  function tsdbExtractHome(events,teamId){
+    return events.filter(g=>g.teams?.home?.id===teamId)
+      .map(g=>({ts:g.scores?.home?.total,os:g.scores?.away?.total}))
+      .filter(g=>g.ts!=null&&g.os!=null);
+  }
+
+  function tsdbExtractAway(events,teamId){
+    return events.filter(g=>g.teams?.away?.id===teamId)
+      .map(g=>({ts:g.scores?.away?.total,os:g.scores?.home?.total}))
+      .filter(g=>g.ts!=null&&g.os!=null);
+  }
+
+  function renderCandidates(candidates, side){
+    const el=document.getElementById('candidates'+side.charAt(0).toUpperCase()+side.slice(1));
+    el.style.display='flex';
+    el.innerHTML=candidates.map(t=>
+      `<button onclick="selectTeam(${t.id},'${t.name.replace(/'/g,"\'")}','${side}')"
+        style="background:#0D1525;border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:7px 10px;font-size:12px;cursor:pointer;text-align:left">
+        ${t.name} <span style="color:var(--muted);font-size:10px">${t.country?.name||''}</span>
+      </button>`
+    ).join('');
+  }
+
+  function selectTeam(id, name, side){
+    if(side==='dom'){selectedDomTeam={id,name};}
+    else{selectedExtTeam={id,name};}
+    const el=document.getElementById('fetch'+side.charAt(0).toUpperCase()+side.slice(1));
+    el.value=name;
+    document.getElementById('candidates'+side.charAt(0).toUpperCase()+side.slice(1)).style.display='none';
+    document.getElementById("fetchStatus").textContent="✅ "+name+" sélectionné(e). "+(selectedDomTeam&&selectedExtTeam?"Clique Charger les stats.":"Sélectionne l'autre équipe.");
+    document.getElementById('fetchStatus').style.color='var(--green)';
+    if(selectedDomTeam&&selectedExtTeam) loadStats();
+  }
+
+  async function tsdbSearch(){
+    const domName=document.getElementById('fetchDom').value.trim();
+    const extName=document.getElementById('fetchExt').value.trim();
+    if(!domName||!extName){
+      setFetchStatus("fetchStatus","error","Entre les deux noms d'équipes.");return;
+    }
+    setFetchStatus('fetchStatus','loading','🔍 Recherche en cours...');
+    try{
+      const [domC,extC]=await Promise.all([tsdbSearchCandidates(domName),tsdbSearchCandidates(extName)]);
+      if(domC.length===0&&extC.length===0){setFetchStatus("fetchStatus","error","Aucune équipe trouvée.");return;}
+      if(domC.length===1){selectedDomTeam={id:domC[0].id,name:domC[0].name};}
+      else renderCandidates(domC,'dom');
+      if(extC.length===1){selectedExtTeam={id:extC[0].id,name:extC[0].name};}
+      else renderCandidates(extC,'ext');
+      if(domC.length===1&&extC.length===1) loadStats();
+      else setFetchStatus('fetchStatus','loading','Clique sur la bonne équipe pour chaque côté.');
+    }catch(e){setFetchStatus('fetchStatus','error','Erreur: '+e.message);}
+  }
+
+  async function loadStats(){
+    const domTeam=selectedDomTeam, extTeam=selectedExtTeam;
+    if(!domTeam||!extTeam) return;
+    setFetchStatus('fetchStatus','loading','⏳ Chargement des stats...');
+    try{
+      const [domEvts,extEvts]=await Promise.all([tsdbGetLast5(domTeam.id),tsdbGetLast5(extTeam.id)]);
+      const domHome=tsdbExtractHome(domEvts,domTeam.id);
+      const extAway=tsdbExtractAway(extEvts,extTeam.id);
+      if(domHome.length===0&&extAway.length===0){setFetchStatus('fetchStatus','error','Aucun match trouvé pour ces équipes.');return;}
+      makeRows();
+      if(domHome.length) fillFields('d',domHome.slice(0,5));
+      if(extAway.length) fillFields('e',extAway.slice(0,5));
+      recalc();
+      document.getElementById('fetchTeams').innerHTML=
+        '<div class="fetch-team-tag">🏠 <span class="tn">'+domTeam.name+'</span> — '+domHome.length+' matchs DOM</div>'+
+        '<div class="fetch-team-tag">✈️ <span class="tn">'+extTeam.name+'</span> — '+extAway.length+' matchs EXT</div>';
+      setFetchStatus('fetchStatus','success','✅ Stats chargées — DOM: '+domHome.length+' • EXT: '+extAway.length);
+    }catch(e){setFetchStatus('fetchStatus','error','Erreur: '+e.message);}
+  }
+
+  function applyPaste(){
+    const domM=parsePasteBlock(document.getElementById('pasteDom').value);
+    const extM=parsePasteBlock(document.getElementById('pasteExt').value);
+    const domGM=parsePasteBlock(document.getElementById('pasteDomG').value);
+    const extGM=parsePasteBlock(document.getElementById('pasteExtG').value);
+    if(domM.length===0&&extM.length===0){setFetchStatus('pasteStatus','error','❌ Aucun score reconnu.');return;}
+    makeRows();
+    if(domM.length) fillFields('d',domM.slice(0,5));
+    if(extM.length) fillFields('e',extM.slice(0,5));
+    if(domGM.length) fillFields('dg',domGM.slice(0,5));
+    if(extGM.length) fillFields('eg',extGM.slice(0,5));
+    if(domGM.length>=3&&extGM.length>=3) setStable(true);
+    setFetchStatus('pasteStatus','success','✅ DOM: '+Math.min(domM.length,5)+' • EXT: '+Math.min(extM.length,5)+(domGM.length?' • GlobalDOM: '+Math.min(domGM.length,5):'')+(extGM.length?' • GlobalEXT: '+Math.min(extGM.length,5):''));
+    recalc();
+  }
+
+  // ── Boot ─────────────────────────────────────────────
+  makeRows();
+  try{stableMode=localStorage.getItem('hdp_v5_stable')==='1';}catch(e){}
+  try{modeGlobalOnly=localStorage.getItem('hdp_v5_modeGlobal')==='1';}catch(e){}
+  try{recencyMode=localStorage.getItem('hdp_v5_recency')==='1';}catch(e){}
+  document.getElementById('stableOff').classList.toggle('active',!stableMode);
+  document.getElementById('stableOn').classList.toggle('active',stableMode);
+  document.getElementById('modeCtxBtn').classList.toggle('active',!modeGlobalOnly);
+  document.getElementById('modeGlobBtn').classList.toggle('active',modeGlobalOnly);
+  document.getElementById('recencyOff').classList.toggle('active',!recencyMode);
+  document.getElementById('recencyOn').classList.toggle('active',recencyMode);
+  updateAdjUI();
+  recalc();
+</script>
+</body>
+</html>
