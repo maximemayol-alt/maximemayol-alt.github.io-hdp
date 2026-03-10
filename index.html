@@ -126,11 +126,14 @@
   <div class="card">
     <div class="label">🔎 Import automatique des stats <span class="badge new">API-SPORTS</span></div>
     <div class="mini">Recherche les 5 derniers matchs DOM et EXT via API-Sports. Si introuvable, utilise le <b>Paste</b> ci-dessous.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;margin-bottom:4px">
+      <input type="text" id="apiSportsKey" placeholder="Clé API-Sports" style="flex:2;min-width:180px;font-size:13px" />
+    </div>
     <div class="sep"></div>
     <div class="two">
       <div>
         <div class="label" style="margin-bottom:4px">Équipe domicile</div>
-        <input type="text" id="fetchDom" placeholder="Ex: Skallagrimur" />
+        <input type="text" id="fetchDom" placeholder="Ex: Skallagrimur" style="margin-bottom:4px" />
         <div id="candidatesDom" style="margin-top:6px;display:none;flex-direction:column;gap:4px"></div>
       </div>
       <div>
@@ -962,15 +965,17 @@ Mode: ${favSide.toUpperCase()} favori | True line: ${document.getElementById('tr
 
 
   // ── API-Sports ───────────────────────────────────────
-  const APISPORT_KEY='a338395d6fb46b3052c5bde38bc80b2';
   const APISPORT_BASE='https://v1.basketball.api-sports.io/';
+  function getApiSportsKey(){ return document.getElementById('apiSportsKey').value.trim(); }
   let selectedDomTeam=null, selectedExtTeam=null;
 
   async function tsdbFetch(path){
+    const key=getApiSportsKey();
+    if(!key) throw new Error('Clé API-Sports manquante');
     const url=APISPORT_BASE+path;
-    const res=await fetch(url,{headers:{'x-apisports-key':APISPORT_KEY}});
+    const res=await fetch(url,{headers:{'x-apisports-key':key}});
     if(res.ok) return await res.json();
-    throw new Error('HTTP '+res.status);
+    throw new Error('HTTP '+res.status+(res.status===401?' — clé invalide':''));
   }
 
   async function tsdbSearchCandidates(name){
@@ -1018,6 +1023,9 @@ Mode: ${favSide.toUpperCase()} favori | True line: ${document.getElementById('tr
   }
 
   async function tsdbSearch(){
+    const key=getApiSportsKey();
+    if(!key){ setFetchStatus('fetchStatus','error','❌ Entre ta clé API-Sports.'); return; }
+    try{ localStorage.setItem('apisports_key', key); }catch(e){}
     const domName=document.getElementById('fetchDom').value.trim();
     const extName=document.getElementById('fetchExt').value.trim();
     if(!domName||!extName){
@@ -1150,6 +1158,7 @@ Mode: ${favSide.toUpperCase()} favori | True line: ${document.getElementById('tr
   document.getElementById('recencyOff').classList.toggle('active',!recencyMode);
   document.getElementById('recencyOn').classList.toggle('active',recencyMode);
   try{ document.getElementById('oddsApiKey').value = localStorage.getItem('odds_api_key') || ''; }catch(e){}
+  try{ document.getElementById('apiSportsKey').value = localStorage.getItem('apisports_key') || ''; }catch(e){}
   updateAdjUI();
   recalc();
 </script>
