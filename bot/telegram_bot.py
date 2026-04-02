@@ -27,18 +27,31 @@ async def _send(text: str) -> None:
 
 
 async def send_verdict(v: Verdict) -> None:
-    """Envoie un verdict formaté sur Telegram."""
-    msg = (
-        f"🏀 <b>{v.match}</b> — {v.league}\n"
-        f"📊 Score MT : {v.home_score}-{v.away_score}\n"
-        f"⚡ Pace : {v.pace} | Ligne : {v.line} | GAP : {v.gap:+.1f}\n"
-        f"🎯 Shooting : {v.home_fg_pct:.0f}% / {v.away_fg_pct:.0f}%\n"
-        f"⚠️ Fautes : {v.total_fouls} | Reb Off : {v.total_off_reb}\n"
-        f"→ <b>{v.signal}</b>\n"
-        f"📈 EV estimé : {v.ev:+.1%}\n"
-        f"\n"
-        f"<i>{v.reasoning}</i>"
-    )
+    """Envoie un verdict — format complet si cote dispo, pace-only sinon."""
+    if v.has_line:
+        msg = (
+            f"🏀 <b>{v.match}</b> — {v.league}\n"
+            f"📊 Score MT : {v.home_score}-{v.away_score}\n"
+            f"⚡ Pace : {v.pace} | Ligne : {v.line} | GAP : {v.gap:+.1f}\n"
+            f"🎯 Shooting : {v.home_fg_pct:.0f}% / {v.away_fg_pct:.0f}%\n"
+            f"⚠️ Fautes : {v.total_fouls} | Reb Off : {v.total_off_reb}\n"
+            f"→ <b>{v.signal}</b>\n"
+            f"📈 EV estimé : {v.ev:+.1%}\n"
+            f"\n"
+            f"<i>{v.reasoning}</i>"
+        )
+    else:
+        msg = (
+            f"🏀 <b>{v.match}</b> — {v.league}\n"
+            f"📊 Score MT : {v.home_score}-{v.away_score}\n"
+            f"⚡️ Pace projeté : {v.pace}\n"
+            f"🎯 Shooting : {v.home_fg_pct:.0f}% / {v.away_fg_pct:.0f}%\n"
+            f"⚠️ Fautes : {v.total_fouls} | Reb Off : {v.total_off_reb}\n"
+            f"📌 Vérifie la ligne sur PS3838\n"
+            f"→ Signal directionnel : <b>{v.signal}</b>\n"
+            f"\n"
+            f"<i>{v.reasoning}</i>"
+        )
     await _send(msg)
 
 

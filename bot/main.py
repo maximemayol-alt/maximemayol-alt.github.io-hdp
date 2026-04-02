@@ -7,7 +7,7 @@ import sys
 from config import SCAN_INTERVAL, TELEGRAM_BOT_TOKEN, ODDS_API_KEY
 from sofascore import get_halftime_events, get_match_stats
 from odds import fetch_live_ou_lines, find_line_for_match
-from analyzer import analyze
+from analyzer import analyze_with_line, analyze_pace_only
 from telegram_bot import send_verdict, send_status
 
 logging.basicConfig(
@@ -37,12 +37,13 @@ async def scan_once() -> None:
 
     log.info(f"{len(ht_events)} match(s) mi-temps détecté(s).")
 
-    # 2) Récupérer les lignes O/U
-    try:
-        ou_lines = await fetch_live_ou_lines()
-    except Exception as e:
-        log.error(f"Erreur Odds API : {e}")
-        ou_lines = {}
+    # 2) Récupérer les lignes O/U (si clé API dispo)
+    ou_lines = {}
+    if ODDS_API_KEY:
+        try:
+            ou_lines = await fetch_live_ou_lines()
+        except Exception as e:
+            log.error(f"Erreur Odds API : {e}")
 
     # 3) Analyser chaque match
     for ev in ht_events:
@@ -57,34 +58,20 @@ async def scan_once() -> None:
         if not stats:
             continue
 
-        # Ligne O/U
+        # Chercher la ligne O/U
         line = find_line_for_match(ou_lines, stats.home_team, stats.away_team)
-        if not line:
-            log.info(f"Pas de ligne O/U pour {match_name} — ignoré.")
-            total_ht = stats.home_score + stats.away_score
-            pace = total_ht / 20 * 40
-            await send_status(
-                f"⚠️ <b>Match HT sans cote</b>\n"
-                f"🏀 {match_name} — {ev['league']}\n"
-                f"📊 Score MT : {stats.home_score}-{stats.away_score}\n"
-                f"⚡ Pace estimé : {pace:.0f}\n"
-                f"❌ Aucune ligne O/U trouvée sur The Odds API"
-            )
-            _signaled.add(event_id)
-            continue
 
-        # Verdict
-        verdict = analyze(stats, line)
-        log.info(f"{match_name}: {verdict.signal} (GAP={verdict.gap:+.1f}, EV={verdict.ev:+.1%})")
-
-        # Envoyer uniquement les signaux OVER/UNDER (pas les PASSER)
-        if "PASSER" not in verdict.signal:
-            await send_verdict(verdict)
-            _signaled.add(event_id)
+        if line:
+            # Mode complet — avec GAP et EV
+            verdict = analyze_with_line(stats, line)
+            log.info(f"[COMPLET] {match_name}: {verdict.signal} (GAP={verdict.gap:+.1f}, EV={verdict.ev:+.1%})")
         else:
-            # Envoyer aussi les PASSER pour info
-            await send_verdict(verdict)
-            _signaled.add(event_id)
+            # Mode pace-only — signal directionnel
+            verdict = analyze_pace_only(stats)
+            log.info(f"[PACE] {match_name}: {verdict.signal} (Pace={verdict.pace})")
+
+        await send_verdict(verdict)
+        _signaled.add(event_id)
 
 
 async def main() -> None:
@@ -93,7 +80,7 @@ async def main() -> None:
         log.error("TELEGRAM_BOT_TOKEN manquant dans .env")
         sys.exit(1)
     if not ODDS_API_KEY:
-        log.warning("ODDS_API_KEY manquante — le bot ne pourra pas récupérer les cotes.")
+        log.warning("ODDS_API_KEY manquante — mode pace-only pour tous les matchs.")
 
     log.info("Bot O/U Basketball démarré — scan toutes les %d secondes.", SCAN_INTERVAL)
     await send_status(

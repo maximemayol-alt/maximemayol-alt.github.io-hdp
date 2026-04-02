@@ -154,22 +154,32 @@ async def get_match_stats(event_id: int, match_info: dict) -> Optional[HalftimeD
                 home_val = item.get("home", "")
                 away_val = item.get("away", "")
 
-                if "field goal" in key and "%" in key:
+                if key == "field goals":
+                    # Format: "19/35 (54%)" → extraire le % entre parenthèses
                     ht.home_fg_pct = _parse_pct(home_val)
                     ht.away_fg_pct = _parse_pct(away_val)
                 elif key in ("fouls", "personal fouls", "fautes"):
                     ht.total_fouls = _parse_int(home_val) + _parse_int(away_val)
-                elif "offensive rebound" in key:
+                elif key in ("offensive rebounds", "offensive rebound"):
                     ht.total_off_reb = _parse_int(home_val) + _parse_int(away_val)
 
     return ht
 
 
 def _parse_pct(val) -> float:
+    """Extrait le % depuis '19/35 (54%)' → 54.0, ou '54.2%' → 54.2."""
     if isinstance(val, (int, float)):
         return float(val)
-    m = re.search(r"([\d.]+)", str(val))
-    return float(m.group(1)) if m else 0.0
+    s = str(val)
+    # Chercher le % entre parenthèses : "19/35 (54%)"
+    m = re.search(r"\((\d+)%?\)", s)
+    if m:
+        return float(m.group(1))
+    # Fallback : chercher un nombre suivi de %
+    m = re.search(r"([\d.]+)%", s)
+    if m:
+        return float(m.group(1))
+    return 0.0
 
 
 def _parse_int(val) -> int:

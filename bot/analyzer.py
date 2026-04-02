@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional
 
 from sofascore import HalftimeData
 from odds import OULine
-from config import GAP_STRONG, GAP_WEAK, SHOOTING_HIGH, FOULS_HIGH, ML_BLOWOUT
+from config import GAP_STRONG, GAP_WEAK, SHOOTING_HIGH, FOULS_HIGH
 
 
 @dataclass
@@ -18,28 +19,65 @@ class Verdict:
     home_score: int
     away_score: int
     pace: float
-    line: float
-    gap: float
     home_fg_pct: float
     away_fg_pct: float
     total_fouls: int
     total_off_reb: int
-    ev: float
-    over_odds: float
-    under_odds: float
-    reasoning: str        # Explication courte du verdict
+    reasoning: str
+    # Présents uniquement si cote disponible (mode complet)
+    has_line: bool = False
+    line: float = 0.0
+    gap: float = 0.0
+    ev: float = 0.0
+    over_odds: float = 0.0
+    under_odds: float = 0.0
 
 
-def analyze(data: HalftimeData, line: OULine) -> Verdict:
-    """Analyse complète mi-temps → verdict O/U.
+def _directional_signal(pace: float, home_fg: float, away_fg: float, fouls: int) -> tuple[str, list[str]]:
+    """Signal directionnel basé sur le pace et le contexte, sans ligne de référence.
+    Utilise le pace moyen de la ligue (~160) comme approximation."""
+    LEAGUE_AVG = 160.0
+    gap_vs_avg = pace - LEAGUE_AVG
+    reasons = []
 
-    Logique :
-    - Pace = score_total / 20 * 40  (mi-temps = 20 min)
-    - GAP = pace - ligne
-    - |GAP| >= 8 → signal fort
-    - |GAP| < 3  → PASSER
-    - Entre 3 et 8 → analyser contexte (shooting, fautes, tempo)
-    """
+    shooting_hot = home_fg > SHOOTING_HIGH or away_fg > SHOOTING_HIGH
+    fouls_high = fouls > FOULS_HIGH
+
+    if pace >= 180:
+        if shooting_hot:
+            signal = "OVER ✅"
+            reasons.append(f"Pace élevé ({pace:.0f}) mais FG% chaud → régression possible")
+        else:
+            signal = "OVER ✅"
+            reasons.append(f"Pace très élevé ({pace:.0f})")
+        if fouls_high:
+            reasons.append(f"Fautes élevées ({fouls}) → LF à venir")
+    elif pace <= 140:
+        if fouls_high:
+            signal = "PASSER ⏭️"
+            reasons.append(f"Pace bas ({pace:.0f}) mais fautes ({fouls}) → LF possibles")
+        else:
+            signal = "UNDER ✅"
+            reasons.append(f"Pace bas ({pace:.0f})")
+        if shooting_hot:
+            reasons.append("FG% insoutenable → renforce UNDER")
+    else:
+        # Zone neutre 140–180
+        if shooting_hot and not fouls_high:
+            signal = "UNDER ✅"
+            reasons.append(f"Pace neutre ({pace:.0f}) + FG% insoutenable → régression")
+        elif fouls_high and not shooting_hot:
+            signal = "OVER ✅"
+            reasons.append(f"Pace neutre ({pace:.0f}) + fautes élevées ({fouls})")
+        else:
+            signal = "PASSER ⏭️"
+            reasons.append(f"Pace neutre ({pace:.0f}) — pas de signal clair")
+
+    return signal, reasons
+
+
+def analyze_with_line(data: HalftimeData, line: OULine) -> Verdict:
+    """Analyse complète avec cote O/U — GAP + EV."""
     total_ht = data.home_score + data.away_score
     pace = total_ht / 20 * 40
     gap = pace - line.total
@@ -48,19 +86,13 @@ def analyze(data: HalftimeData, line: OULine) -> Verdict:
     away_fg = data.away_fg_pct
     fouls = data.total_fouls
 
-    # ── Signaux contextuels ────────────────────────────────────
-    # Shooting insoutenable → régression vers la moyenne = UNDER
     shooting_unsustainable = home_fg > SHOOTING_HIGH or away_fg > SHOOTING_HIGH
-
-    # Fautes élevées → lancers francs à venir = OVER
     fouls_high = fouls > FOULS_HIGH
 
-    # ── Verdict ────────────────────────────────────────────────
     abs_gap = abs(gap)
     reasons = []
 
     if abs_gap >= GAP_STRONG:
-        # Signal fort
         if gap > 0:
             signal = "OVER ✅"
             reasons.append(f"GAP fort +{gap:.1f}")
@@ -71,16 +103,11 @@ def analyze(data: HalftimeData, line: OULine) -> Verdict:
             reasons.append(f"GAP fort {gap:.1f}")
             if fouls_high:
                 reasons.append("⚠️ Fautes élevées → LF à venir")
-
     elif abs_gap < GAP_WEAK:
-        # GAP trop faible → PASSER
         signal = "PASSER ⏭️"
         reasons.append(f"GAP insuffisant ({gap:+.1f})")
-
     else:
-        # Zone grise (3–8) → contexte décide
         if gap > 0:
-            # Tendance OVER
             if shooting_unsustainable:
                 signal = "PASSER ⏭️"
                 reasons.append(f"GAP modéré +{gap:.1f} mais FG% insoutenable")
@@ -91,7 +118,6 @@ def analyze(data: HalftimeData, line: OULine) -> Verdict:
                 signal = "OVER ✅"
                 reasons.append(f"GAP modéré +{gap:.1f}")
         else:
-            # Tendance UNDER
             if fouls_high:
                 signal = "PASSER ⏭️"
                 reasons.append(f"GAP {gap:.1f} mais fautes élevées contrebalancent")
@@ -102,9 +128,8 @@ def analyze(data: HalftimeData, line: OULine) -> Verdict:
                 signal = "UNDER ✅"
                 reasons.append(f"GAP modéré {gap:.1f}")
 
-    # ── EV estimé ──────────────────────────────────────────────
+    # EV estimé
     if "OVER" in signal:
-        # Probabilité estimée = 50% + 2% par point de GAP
         fair_prob = min(0.95, 0.50 + abs_gap * 0.02)
         ev = (fair_prob * line.over_odds) - 1
     elif "UNDER" in signal:
@@ -120,14 +145,40 @@ def analyze(data: HalftimeData, line: OULine) -> Verdict:
         home_score=data.home_score,
         away_score=data.away_score,
         pace=round(pace, 1),
-        line=line.total,
-        gap=round(gap, 1),
         home_fg_pct=home_fg,
         away_fg_pct=away_fg,
         total_fouls=fouls,
         total_off_reb=data.total_off_reb,
+        reasoning=" | ".join(reasons),
+        has_line=True,
+        line=line.total,
+        gap=round(gap, 1),
         ev=round(ev, 4),
         over_odds=line.over_odds,
         under_odds=line.under_odds,
+    )
+
+
+def analyze_pace_only(data: HalftimeData) -> Verdict:
+    """Analyse pace-only — sans cote, signal directionnel."""
+    total_ht = data.home_score + data.away_score
+    pace = total_ht / 20 * 40
+
+    signal, reasons = _directional_signal(
+        pace, data.home_fg_pct, data.away_fg_pct, data.total_fouls,
+    )
+
+    return Verdict(
+        match=f"{data.home_team} vs {data.away_team}",
+        league=data.league,
+        signal=signal,
+        home_score=data.home_score,
+        away_score=data.away_score,
+        pace=round(pace, 1),
+        home_fg_pct=data.home_fg_pct,
+        away_fg_pct=data.away_fg_pct,
+        total_fouls=data.total_fouls,
+        total_off_reb=data.total_off_reb,
         reasoning=" | ".join(reasons),
+        has_line=False,
     )
