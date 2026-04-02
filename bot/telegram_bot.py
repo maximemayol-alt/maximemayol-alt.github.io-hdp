@@ -1,16 +1,30 @@
-"""Envoi des verdicts sur Telegram."""
+"""Envoi des verdicts sur Telegram via l'API HTTP directe (httpx)."""
 
 from __future__ import annotations
 
-import telegram
+import httpx
 from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 from calculator import Verdict
+
+API_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
+
+
+async def _send_message(text: str, parse_mode: str = "HTML") -> None:
+    """Envoie un message via l'API Telegram."""
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.post(
+            f"{API_URL}/sendMessage",
+            json={
+                "chat_id": TELEGRAM_CHAT_ID,
+                "text": text,
+                "parse_mode": parse_mode,
+            },
+        )
+        resp.raise_for_status()
 
 
 async def send_verdict(verdict: Verdict) -> None:
     """Envoie un message Telegram formaté avec le verdict."""
-    bot = telegram.Bot(token=TELEGRAM_BOT_TOKEN)
-
     message = (
         f"🏀 <b>{verdict.match}</b>\n"
         f"{'━' * 28}\n"
@@ -20,22 +34,12 @@ async def send_verdict(verdict: Verdict) -> None:
         f"{verdict.details}\n"
         f"{'━' * 28}\n"
     )
-
-    await bot.send_message(
-        chat_id=TELEGRAM_CHAT_ID,
-        text=message,
-        parse_mode="HTML",
-    )
+    await _send_message(message)
 
 
 async def send_status(text: str) -> None:
     """Envoie un message de statut simple."""
-    bot = telegram.Bot(token=TELEGRAM_BOT_TOKEN)
-    await bot.send_message(
-        chat_id=TELEGRAM_CHAT_ID,
-        text=text,
-        parse_mode="HTML",
-    )
+    await _send_message(text)
 
 
 async def send_no_games() -> None:
