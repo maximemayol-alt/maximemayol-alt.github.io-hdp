@@ -61,6 +61,16 @@ async def scan_once() -> None:
         line = find_line_for_match(ou_lines, stats.home_team, stats.away_team)
         if not line:
             log.info(f"Pas de ligne O/U pour {match_name} — ignoré.")
+            total_ht = stats.home_score + stats.away_score
+            pace = total_ht / 20 * 40
+            await send_status(
+                f"⚠️ <b>Match HT sans cote</b>\n"
+                f"🏀 {match_name} — {ev['league']}\n"
+                f"📊 Score MT : {stats.home_score}-{stats.away_score}\n"
+                f"⚡ Pace estimé : {pace:.0f}\n"
+                f"❌ Aucune ligne O/U trouvée sur The Odds API"
+            )
+            _signaled.add(event_id)
             continue
 
         # Verdict
