@@ -7,7 +7,7 @@ from typing import Optional
 
 from sofascore import HalftimeData
 from odds import OULine
-from config import GAP_STRONG, GAP_WEAK, SHOOTING_HIGH, FOULS_HIGH
+from config import GAP_STRONG, GAP_WEAK, SHOOTING_HIGH, FOULS_HIGH, ML_BLOWOUT
 
 
 @dataclass
@@ -31,13 +31,21 @@ class Verdict:
     ev: float = 0.0
     over_odds: float = 0.0
     under_odds: float = 0.0
+    home_ml: float = 0.0
+    away_ml: float = 0.0
+
+
+def _ml_is_blowout(home_ml: float, away_ml: float) -> bool:
+    """Détecte si un favori écrase le match (ML < 1.30)."""
+    if home_ml > 0 and home_ml < ML_BLOWOUT:
+        return True
+    if away_ml > 0 and away_ml < ML_BLOWOUT:
+        return True
+    return False
 
 
 def _directional_signal(pace: float, home_fg: float, away_fg: float, fouls: int) -> tuple[str, list[str]]:
-    """Signal directionnel basé sur le pace et le contexte, sans ligne de référence.
-    Utilise le pace moyen de la ligue (~160) comme approximation."""
-    LEAGUE_AVG = 160.0
-    gap_vs_avg = pace - LEAGUE_AVG
+    """Signal directionnel basé sur le pace et le contexte, sans ligne."""
     reasons = []
 
     shooting_hot = home_fg > SHOOTING_HIGH or away_fg > SHOOTING_HIGH
@@ -77,7 +85,7 @@ def _directional_signal(pace: float, home_fg: float, away_fg: float, fouls: int)
 
 
 def analyze_with_line(data: HalftimeData, line: OULine) -> Verdict:
-    """Analyse complète avec cote O/U — GAP + EV."""
+    """Analyse complète avec cote O/U — GAP + EV + signal ML."""
     total_ht = data.home_score + data.away_score
     pace = total_ht / 20 * 40
     gap = pace - line.total
@@ -88,11 +96,13 @@ def analyze_with_line(data: HalftimeData, line: OULine) -> Verdict:
 
     shooting_unsustainable = home_fg > SHOOTING_HIGH or away_fg > SHOOTING_HIGH
     fouls_high = fouls > FOULS_HIGH
+    blowout = _ml_is_blowout(line.home_ml, line.away_ml)
 
     abs_gap = abs(gap)
     reasons = []
 
     if abs_gap >= GAP_STRONG:
+        # Signal fort
         if gap > 0:
             signal = "OVER ✅"
             reasons.append(f"GAP fort +{gap:.1f}")
@@ -104,9 +114,11 @@ def analyze_with_line(data: HalftimeData, line: OULine) -> Verdict:
             if fouls_high:
                 reasons.append("⚠️ Fautes élevées → LF à venir")
     elif abs_gap < GAP_WEAK:
+        # GAP trop faible
         signal = "PASSER ⏭️"
         reasons.append(f"GAP insuffisant ({gap:+.1f})")
     else:
+        # Zone grise (3–8) → contexte décide
         if gap > 0:
             if shooting_unsustainable:
                 signal = "PASSER ⏭️"
@@ -127,6 +139,13 @@ def analyze_with_line(data: HalftimeData, line: OULine) -> Verdict:
             else:
                 signal = "UNDER ✅"
                 reasons.append(f"GAP modéré {gap:.1f}")
+
+    # Signal ML : favori écrasant + GAP faible → PASSER
+    if blowout and abs_gap < GAP_STRONG:
+        fav_ml = min(line.home_ml, line.away_ml) if line.home_ml > 0 and line.away_ml > 0 else 0
+        if fav_ml > 0:
+            signal = "PASSER ⏭️"
+            reasons.append(f"ML favori {fav_ml:.2f} < {ML_BLOWOUT} → gestion tempo")
 
     # EV estimé
     if "OVER" in signal:
@@ -156,6 +175,8 @@ def analyze_with_line(data: HalftimeData, line: OULine) -> Verdict:
         ev=round(ev, 4),
         over_odds=line.over_odds,
         under_odds=line.under_odds,
+        home_ml=line.home_ml,
+        away_ml=line.away_ml,
     )
 
 

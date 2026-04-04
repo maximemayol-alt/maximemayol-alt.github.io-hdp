@@ -99,6 +99,8 @@ async def scan_once() -> None:
                 over_odds=ps_match.over_odds,
                 under_odds=ps_match.under_odds,
                 bookmaker="ps3838",
+                home_ml=ps_match.home_ml,
+                away_ml=ps_match.away_ml,
             )
             source = "PS3838"
 

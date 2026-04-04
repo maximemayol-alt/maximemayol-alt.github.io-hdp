@@ -29,12 +29,15 @@ async def _send(text: str) -> None:
 async def send_verdict(v: Verdict) -> None:
     """Envoie un verdict — format complet si cote dispo, pace-only sinon."""
     if v.has_line:
+        ml_str = ""
+        if v.home_ml > 0 and v.away_ml > 0:
+            ml_str = f"\n💰 ML : {v.home_ml:.2f} / {v.away_ml:.2f}"
         msg = (
             f"🏀 <b>{v.match}</b> — {v.league}\n"
             f"📊 Score MT : {v.home_score}-{v.away_score}\n"
             f"⚡ Pace : {v.pace} | Ligne : {v.line} | GAP : {v.gap:+.1f}\n"
             f"🎯 Shooting : {v.home_fg_pct:.0f}% / {v.away_fg_pct:.0f}%\n"
-            f"⚠️ Fautes : {v.total_fouls} | Reb Off : {v.total_off_reb}\n"
+            f"⚠️ Fautes : {v.total_fouls} | Reb Off : {v.total_off_reb}{ml_str}\n"
             f"→ <b>{v.signal}</b>\n"
             f"📈 EV estimé : {v.ev:+.1%}\n"
             f"\n"

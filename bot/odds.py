@@ -19,6 +19,8 @@ class OULine:
     total: float          # Ligne (ex: 165.5)
     over_odds: float      # Cote OVER décimale
     under_odds: float     # Cote UNDER décimale
+    home_ml: float = 0.0  # Cote ML domicile (0 = pas dispo)
+    away_ml: float = 0.0  # Cote ML extérieur (0 = pas dispo)
     bookmaker: str = ""
 
 

@@ -1,30 +1,27 @@
 """Scraping des cotes O/U sur PS3838 (ps898989.com) via Playwright.
 
-Ce scraper nécessite un vrai navigateur (Playwright + Chromium).
-Il ne fonctionne PAS depuis un serveur — uniquement en local avec
-une IP résidentielle (Cloudflare bloque les datacenter IPs).
+Stratégie : intercepter les réponses JSON de l'API interne Pinnacle
+que la SPA charge automatiquement. Plus fiable que parser le HTML.
 
-Usage :
-    from ps3838 import fetch_ps3838_lines
-    lines = await fetch_ps3838_lines()
+Nécessite Playwright + Chromium. Ne fonctionne qu'avec une IP
+résidentielle (Cloudflare bloque les IPs datacenter).
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
-from playwright.async_api import async_playwright, Page
+from playwright.async_api import async_playwright, Response
 
 log = logging.getLogger(__name__)
 
 PS3838_URL = "https://ps898989.com/m/fr/asian/sp"
-
-# Temps d'attente pour le chargement JS (SPA)
-PAGE_LOAD_WAIT = 5
+PS3838_BASKETBALL_URL = "https://ps898989.com/m/fr/asian/sp/4"  # 4 = basketball
 
 
 @dataclass
@@ -32,23 +29,56 @@ class PS3838Line:
     """Ligne O/U PS3838 pour un match."""
     home_team: str
     away_team: str
-    total: float          # Ligne (ex: 165.5)
+    total: float          # Ligne O/U (ex: 165.5)
     over_odds: float      # Cote OVER décimale
     under_odds: float     # Cote UNDER décimale
+    home_ml: float = 0.0  # Cote ML domicile
+    away_ml: float = 0.0  # Cote ML extérieur
+
+
+# ── Données capturées via interception réseau ──────────────────
+_captured_matchups: list[dict] = []
+_captured_odds: list[dict] = []
+
+
+async def _on_response(response: Response) -> None:
+    """Callback : capture les réponses JSON de l'API Pinnacle interne."""
+    url = response.url.lower()
+    try:
+        if response.status == 200 and "application/json" in (response.headers.get("content-type", "")):
+            # Matchups (liste des matchs)
+            if "matchups" in url and "sports" in url:
+                data = await response.json()
+                if isinstance(data, list):
+                    _captured_matchups.extend(data)
+                    log.info(f"PS3838: {len(data)} matchups capturés")
+            # Odds / Markets (cotes)
+            elif "markets" in url or "odds" in url or "straight" in url:
+                data = await response.json()
+                if isinstance(data, list):
+                    _captured_odds.extend(data)
+                    log.info(f"PS3838: {len(data)} lignes de cotes capturées")
+    except Exception:
+        pass
 
 
 async def fetch_ps3838_lines() -> list[PS3838Line]:
-    """Lance Playwright, navigue vers PS3838 basket, extrait les lignes O/U.
+    """Ouvre PS3838 basket via Playwright, intercepte les données JSON,
+    et retourne les lignes O/U de tous les matchs live."""
 
-    Retourne une liste vide si le scraping échoue.
-    """
-    lines: list[PS3838Line] = []
+    global _captured_matchups, _captured_odds
+    _captured_matchups = []
+    _captured_odds = []
 
     try:
         async with async_playwright() as pw:
             browser = await pw.chromium.launch(
                 headless=True,
-                args=["--no-sandbox", "--disable-blink-features=AutomationControlled"],
+                args=[
+                    "--no-sandbox",
+                    "--disable-blink-features=AutomationControlled",
+                    "--disable-dev-shm-usage",
+                ],
             )
             context = await browser.new_context(
                 user_agent=(
@@ -59,243 +89,186 @@ async def fetch_ps3838_lines() -> list[PS3838Line]:
                 viewport={"width": 390, "height": 844},
                 locale="fr-FR",
             )
+
             page = await context.new_page()
 
-            log.info("Navigation vers PS3838...")
-            await page.goto(PS3838_URL, wait_until="domcontentloaded", timeout=30000)
-            await asyncio.sleep(PAGE_LOAD_WAIT)
+            # Intercepter toutes les réponses réseau
+            page.on("response", _on_response)
 
-            # Cliquer sur Basketball si nécessaire (menu sports)
+            # 1) Charger la page basket
+            log.info("PS3838: chargement de la page basket...")
+            await page.goto(PS3838_BASKETBALL_URL, wait_until="domcontentloaded", timeout=30000)
+            await asyncio.sleep(3)
+
+            # 2) Cliquer sur "Live" si un onglet existe
             try:
-                basketball_btn = page.locator("text=Basketball").first
-                if await basketball_btn.is_visible(timeout=3000):
-                    await basketball_btn.click()
+                live_btn = page.locator("text=/live|en direct|en cours/i").first
+                if await live_btn.is_visible(timeout=2000):
+                    await live_btn.click()
                     await asyncio.sleep(2)
             except Exception:
-                pass  # Peut-être déjà sur la page basket
+                pass
 
-            # Extraire les lignes O/U depuis le DOM
-            lines = await _extract_lines(page)
-            log.info(f"{len(lines)} ligne(s) O/U extraites de PS3838.")
+            # 3) Scroller pour charger tous les matchs
+            for _ in range(3):
+                await page.evaluate("window.scrollBy(0, 800)")
+                await asyncio.sleep(1)
 
+            # 4) Si l'API interception n'a rien donné, fallback HTML
+            if not _captured_matchups and not _captured_odds:
+                log.info("PS3838: pas de données API interceptées, fallback HTML...")
+                lines = await _extract_from_html(page)
+            else:
+                lines = _parse_api_data()
+
+            log.info(f"PS3838: {len(lines)} ligne(s) O/U extraites au total.")
             await browser.close()
-
-    except Exception as e:
-        log.error(f"Erreur scraping PS3838 : {e}")
-
-    return lines
-
-
-async def _extract_lines(page: Page) -> list[PS3838Line]:
-    """Extrait les lignes O/U depuis la page PS3838.
-
-    PS3838 mobile affiche les matchs dans des blocs avec :
-    - Noms d'équipes
-    - Lignes spread/total
-    - Cotes associées
-
-    La structure varie selon les versions, on essaie plusieurs sélecteurs.
-    """
-    lines: list[PS3838Line] = []
-
-    # ── Stratégie 1 : structure SPA moderne ────────────────────
-    # PS3838 utilise des conteneurs de match avec des data-attributes
-    events = await page.query_selector_all(
-        "[class*='event-row'], [class*='match-row'], [class*='game-line'], "
-        "[class*='event_'], [data-event-id], [class*='matchup']"
-    )
-
-    if events:
-        lines = await _parse_event_rows(page, events)
-        if lines:
             return lines
 
-    # ── Stratégie 2 : extraction par tables ────────────────────
-    # Certaines versions utilisent des tables HTML
-    tables = await page.query_selector_all("table")
-    for table in tables:
-        table_lines = await _parse_table(table)
-        lines.extend(table_lines)
-
-    if lines:
-        return lines
-
-    # ── Stratégie 3 : extraction brute du texte visible ────────
-    # Fallback : parser le texte de la page entière
-    log.warning("Sélecteurs spécifiques non trouvés — fallback texte brut.")
-    content = await page.inner_text("body")
-    lines = _parse_raw_text(content)
-
-    return lines
+    except Exception as e:
+        log.error(f"PS3838: erreur scraping — {e}")
+        return []
 
 
-async def _parse_event_rows(page: Page, events) -> list[PS3838Line]:
-    """Parse les blocs d'événements individuels."""
+def _parse_api_data() -> list[PS3838Line]:
+    """Parse les données JSON capturées depuis l'API Pinnacle interne."""
     lines = []
 
-    for event in events:
-        try:
-            text = await event.inner_text()
-            text_lines = [l.strip() for l in text.split("\n") if l.strip()]
+    # Indexer les matchups par ID
+    matchup_map: dict[int, dict] = {}
+    for m in _captured_matchups:
+        mid = m.get("id")
+        if not mid:
+            continue
+        participants = m.get("participants", [])
+        if len(participants) >= 2:
+            home = next(
+                (p.get("name", "") for p in participants if p.get("alignment") == "home"),
+                participants[0].get("name", ""),
+            )
+            away = next(
+                (p.get("name", "") for p in participants if p.get("alignment") == "away"),
+                participants[1].get("name", ""),
+            )
+            matchup_map[mid] = {"home": home, "away": away}
 
-            # Chercher des noms d'équipes (au moins 2 lignes de texte)
-            teams = []
-            ou_data = {"total": 0.0, "over": 0.0, "under": 0.0}
+    # Extraire les lignes O/U et ML depuis les cotes
+    match_data: dict[int, dict] = {}
 
-            for i, line in enumerate(text_lines):
-                # Détecter les cotes (nombres décimaux entre 1.0 et 9.99)
-                odds_matches = re.findall(r"\b(\d\.\d{2,3})\b", line)
-
-                # Détecter les lignes O/U (nombre avec .5 typiquement)
-                total_match = re.search(r"\b(\d{2,3}\.5)\b", line)
-
-                if total_match:
-                    ou_data["total"] = float(total_match.group(1))
-
-                if odds_matches and ou_data["total"] > 0:
-                    for odds_str in odds_matches:
-                        odds_val = float(odds_str)
-                        if 1.01 < odds_val < 5.0:
-                            if ou_data["over"] == 0:
-                                ou_data["over"] = odds_val
-                            elif ou_data["under"] == 0:
-                                ou_data["under"] = odds_val
-
-                # Noms d'équipe : texte qui n'est pas un nombre
-                if not re.match(r"^[\d.\s+\-o/u]+$", line, re.IGNORECASE):
-                    if len(line) > 2 and not any(c in line for c in ["@", ":", "/"]):
-                        teams.append(line)
-
-            if (
-                len(teams) >= 2
-                and ou_data["total"] > 50
-                and ou_data["over"] > 1
-                and ou_data["under"] > 1
-            ):
-                lines.append(PS3838Line(
-                    home_team=teams[0],
-                    away_team=teams[1],
-                    total=ou_data["total"],
-                    over_odds=ou_data["over"],
-                    under_odds=ou_data["under"],
-                ))
-        except Exception:
+    for item in _captured_odds:
+        matchup_id = item.get("matchupId")
+        if matchup_id not in matchup_map:
             continue
 
+        if matchup_id not in match_data:
+            match_data[matchup_id] = {
+                "total": 0, "over": 0, "under": 0,
+                "home_ml": 0, "away_ml": 0,
+            }
+
+        for price in item.get("prices", []):
+            ptype = price.get("type", "")
+            designation = price.get("designation", "")
+            points = price.get("points")
+            odds = price.get("price", 0)
+            dec_odds = _to_decimal(odds)
+
+            if ptype == "total" and points:
+                match_data[matchup_id]["total"] = float(points)
+                if designation == "over":
+                    match_data[matchup_id]["over"] = dec_odds
+                elif designation == "under":
+                    match_data[matchup_id]["under"] = dec_odds
+            elif ptype == "moneyline":
+                if designation == "home":
+                    match_data[matchup_id]["home_ml"] = dec_odds
+                elif designation == "away":
+                    match_data[matchup_id]["away_ml"] = dec_odds
+
+    # Construire les lignes
+    for mid, data in match_data.items():
+        if mid not in matchup_map:
+            continue
+        if data["total"] > 0 and data["over"] > 0 and data["under"] > 0:
+            teams = matchup_map[mid]
+            lines.append(PS3838Line(
+                home_team=teams["home"],
+                away_team=teams["away"],
+                total=data["total"],
+                over_odds=data["over"],
+                under_odds=data["under"],
+                home_ml=data["home_ml"],
+                away_ml=data["away_ml"],
+            ))
+
     return lines
 
 
-async def _parse_table(table) -> list[PS3838Line]:
-    """Parse une table HTML de cotes."""
+async def _extract_from_html(page) -> list[PS3838Line]:
+    """Fallback : extraire les données directement du HTML/texte visible."""
     lines = []
+
     try:
-        rows = await table.query_selector_all("tr")
-        current_teams = []
-
-        for row in rows:
-            text = await row.inner_text()
-            cells = [c.strip() for c in text.split("\t") if c.strip()]
-
-            # Chercher les noms d'équipe et les cotes dans la même ligne
-            teams_in_row = []
-            odds_in_row = []
-            total_in_row = None
-
-            for cell in cells:
-                # Total O/U
-                total_m = re.search(r"(\d{2,3}\.5)", cell)
-                if total_m:
-                    total_in_row = float(total_m.group(1))
-
-                # Cotes
-                odds_m = re.findall(r"\b(\d\.\d{2,3})\b", cell)
-                for o in odds_m:
-                    val = float(o)
-                    if 1.01 < val < 5.0:
-                        odds_in_row.append(val)
-
-                # Équipe
-                if (
-                    len(cell) > 2
-                    and not re.match(r"^[\d.\s]+$", cell)
-                    and not total_m
-                ):
-                    teams_in_row.append(cell)
-
-            if teams_in_row:
-                current_teams = teams_in_row
-
-            if total_in_row and len(odds_in_row) >= 2 and len(current_teams) >= 2:
-                lines.append(PS3838Line(
-                    home_team=current_teams[0],
-                    away_team=current_teams[-1],
-                    total=total_in_row,
-                    over_odds=odds_in_row[0],
-                    under_odds=odds_in_row[1],
-                ))
-                current_teams = []
-
+        content = await page.inner_text("body")
     except Exception:
-        pass
+        return lines
 
-    return lines
-
-
-def _parse_raw_text(content: str) -> list[PS3838Line]:
-    """Parse le texte brut de la page pour extraire les lignes O/U.
-
-    Cherche des patterns comme :
-        Equipe A
-        Equipe B
-        o 165.5  1.87
-        u 165.5  1.93
-    """
-    lines_out = []
-    text_lines = content.split("\n")
-    text_lines = [l.strip() for l in text_lines if l.strip()]
+    text_lines = [l.strip() for l in content.split("\n") if l.strip()]
 
     i = 0
-    while i < len(text_lines) - 3:
+    while i < len(text_lines):
         line = text_lines[i]
 
-        # Chercher un pattern O/U : "o 165.5" ou "Over 165.5"
-        ou_match = re.match(r"(?:o|over|O)\s+(\d{2,3}\.5)\s+(\d\.\d{2,3})", line, re.IGNORECASE)
-        if ou_match:
-            total = float(ou_match.group(1))
-            over_odds = float(ou_match.group(2))
+        # Chercher un total O/U : nombre comme 165.5, 178.0, etc.
+        total_m = re.search(r"\b(\d{2,3}(?:\.5|\.0))\b", line)
+        if total_m:
+            total = float(total_m.group(1))
+            if 80 < total < 300:  # Plage réaliste basket
+                # Chercher les cotes autour (±3 lignes)
+                over_odds = 0.0
+                under_odds = 0.0
+                teams = []
 
-            # La ligne suivante devrait être Under
-            if i + 1 < len(text_lines):
-                under_match = re.match(
-                    r"(?:u|under|U)\s+\d{2,3}\.5\s+(\d\.\d{2,3})",
-                    text_lines[i + 1],
-                    re.IGNORECASE,
-                )
-                if under_match:
-                    under_odds = float(under_match.group(1))
+                for j in range(max(0, i - 5), min(len(text_lines), i + 5)):
+                    odds_found = re.findall(r"\b(\d\.\d{2,3})\b", text_lines[j])
+                    for o in odds_found:
+                        val = float(o)
+                        if 1.01 < val < 5.0:
+                            if over_odds == 0:
+                                over_odds = val
+                            elif under_odds == 0:
+                                under_odds = val
 
-                    # Remonter pour trouver les noms d'équipes
-                    teams = []
-                    for j in range(max(0, i - 5), i):
-                        t = text_lines[j]
-                        if (
-                            len(t) > 2
-                            and not re.match(r"^[\d.\s\-+]+$", t)
-                            and not re.match(r"^[ou]", t, re.IGNORECASE)
-                        ):
-                            teams.append(t)
+                    # Noms d'équipe (texte non-numérique, > 3 chars)
+                    t = text_lines[j]
+                    if (
+                        len(t) > 3
+                        and not re.match(r"^[\d.\s+\-oOuU/]+$", t)
+                        and not re.search(r"\d\.\d{2}", t)
+                        and t.lower() not in ("over", "under", "total", "basketball")
+                    ):
+                        teams.append(t)
 
-                    if len(teams) >= 2:
-                        lines_out.append(PS3838Line(
-                            home_team=teams[-2],
-                            away_team=teams[-1],
-                            total=total,
-                            over_odds=over_odds,
-                            under_odds=under_odds,
-                        ))
+                if over_odds > 0 and under_odds > 0 and len(teams) >= 2:
+                    lines.append(PS3838Line(
+                        home_team=teams[0],
+                        away_team=teams[1] if len(teams) > 1 else "",
+                        total=total,
+                        over_odds=over_odds,
+                        under_odds=under_odds,
+                    ))
         i += 1
 
-    return lines_out
+    return lines
+
+
+def _to_decimal(american: float) -> float:
+    """Convertit cote américaine → décimale."""
+    if american >= 100:
+        return round(1 + american / 100, 3)
+    elif american <= -100:
+        return round(1 + 100 / abs(american), 3)
+    return american if american > 1 else 2.0
 
 
 def find_ps3838_line(
@@ -305,8 +278,8 @@ def find_ps3838_line(
 ) -> Optional[PS3838Line]:
     """Trouve la ligne PS3838 correspondant au match Sofascore.
     Matching par mots communs dans les noms d'équipe."""
-    home_lower = home_team.lower()
-    away_lower = away_team.lower()
+    home_words = [w for w in home_team.lower().split() if len(w) > 2]
+    away_words = [w for w in away_team.lower().split() if len(w) > 2]
 
     best = None
     best_score = 0
@@ -316,15 +289,15 @@ def find_ps3838_line(
         ps_away = line.away_team.lower()
         score = 0
 
-        for word in home_lower.split():
-            if len(word) > 2 and word in ps_home:
+        for w in home_words:
+            if w in ps_home:
                 score += 2
-        for word in away_lower.split():
-            if len(word) > 2 and word in ps_away:
+            elif w in ps_away:
+                score += 1  # Cross-match partiel
+        for w in away_words:
+            if w in ps_away:
                 score += 2
-        # Cross-match
-        for word in home_lower.split():
-            if len(word) > 3 and (word in ps_home or word in ps_away):
+            elif w in ps_home:
                 score += 1
 
         if score > best_score:
