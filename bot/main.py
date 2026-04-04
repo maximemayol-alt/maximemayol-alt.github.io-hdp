@@ -138,11 +138,51 @@ async def main() -> None:
     )
 
     while True:
+        # Vérifier les commandes Telegram (/ping, /status)
+        await _check_commands()
+
         try:
             await scan_once()
         except Exception as e:
             log.error(f"Erreur scan : {e}", exc_info=True)
         await asyncio.sleep(SCAN_INTERVAL)
+
+
+async def _check_commands() -> None:
+    """Vérifie si des commandes ont été envoyées au bot."""
+    import httpx
+    from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+
+    global _cmd_offset
+    if not hasattr(_check_commands, "_offset"):
+        _check_commands._offset = 0
+
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(
+                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates",
+                params={"offset": _check_commands._offset, "timeout": 1},
+            )
+            data = resp.json()
+    except Exception:
+        return
+
+    for update in data.get("result", []):
+        _check_commands._offset = update["update_id"] + 1
+        msg = update.get("message", {})
+        text = msg.get("text", "").strip().lower()
+        chat_id = msg.get("chat", {}).get("id")
+
+        if chat_id != TELEGRAM_CHAT_ID:
+            continue
+
+        if text in ("/ping", "/status"):
+            count = len(_signaled)
+            await send_status(
+                f"🟢 <b>Bot actif</b>\n"
+                f"Matchs signalés cette session : {count}\n"
+                f"Scan toutes les {SCAN_INTERVAL}s"
+            )
 
 
 if __name__ == "__main__":
