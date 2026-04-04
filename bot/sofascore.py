@@ -89,21 +89,19 @@ async def get_halftime_events() -> list[dict]:
         if not league:
             continue
 
-        # Détecter la mi-temps (= pause après Q2 en basket)
+        # Détecter la mi-temps
+        # Sofascore codes basket :
+        #   13=Q1, 14=Q2, 15=Q3, 16=Q4, 31=Halftime
+        # Le code 31 est le seul fiable pour la vraie mi-temps
         status = ev.get("status", {})
+        status_code = status.get("code", 0)
         status_desc = status.get("description", "").lower()
-        status_type = status.get("type", "").lower()
-        period = status.get("period")
 
         is_halftime = (
-            "halftime" in status_desc
-            or "half time" in status_desc
+            status_code == 31
+            or status_desc == "halftime"
+            or status_desc == "half time"
             or status_desc == "ht"
-            or status_type == "halftime"
-            # Sofascore utilise "Pause" pour la mi-temps basket
-            or ("pause" in status_desc and period in (None, 2, "2"))
-            # Fin du Q2 encore marqué inprogress
-            or (status_desc == "2nd quarter" and "ended" in status_type)
         )
 
         if not is_halftime:
@@ -111,6 +109,12 @@ async def get_halftime_events() -> list[dict]:
 
         home_score = ev.get("homeScore", {}).get("current", 0)
         away_score = ev.get("awayScore", {}).get("current", 0)
+
+        log.info(
+            f"HT détecté : {ev['homeTeam']['name']} vs {ev['awayTeam']['name']} "
+            f"({home_score}-{away_score}) — code={status_code} desc=\"{status_desc}\" "
+            f"league={league}"
+        )
 
         results.append({
             "id": ev["id"],
