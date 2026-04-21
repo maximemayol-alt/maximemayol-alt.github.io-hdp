@@ -1,0 +1,16 @@
+{
+  "name": "next-scorer-bot",
+  "version": "1.0.0",
+  "description": "Basketball next-scorer prediction bot powered by Claude AI",
+  "type": "module",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.51.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
